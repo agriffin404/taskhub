@@ -1,0 +1,1720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjOGI1Y2Y2Ii8+PHN0b3Agb2Zmc2V0PSIuNSIgc3RvcC1jb2xvcj0iIzYzNjZmMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBlYTVlOSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgcng9IjciIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNOSAxNi41bDQuNSA0LjVMMjMgMTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=" />
+<title>TaskHub</title>
+<style>
+  :root { --vio1:#8b5cf6; --vio2:#ec4899; --sky1:#0ea5e9; --sky2:#14b8a6; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f1f5f9; font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, Roboto, sans-serif; color:#1e293b; font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 22px 72px; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  /* two-column desktop layout: main content + sticky Today rail. Rail hidden below breakpoint. */
+  .layout { display:block; }
+  .rail { display:none; }
+  .rail .ev:last-child { margin-bottom:0; }
+  .hdr { border-radius:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .hdr-inner { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px; color:#fff; }
+  .hdr h1 { font-size:22px; margin:0; line-height:1.1; }
+  .hdr p { font-size:13px; margin:2px 0 0; opacity:.9; }
+  .tabs { display:flex; gap:4px; background:rgba(255,255,255,.2); padding:4px; border-radius:12px; }
+  .tab { display:flex; align-items:center; gap:6px; border:none; background:transparent; color:rgba(255,255,255,.9); font-weight:600; font-size:16px; padding:6px 12px; border-radius:8px; cursor:pointer; }
+  .tab.active { background:#fff; }
+  .badge { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9999px; background:#ef4444; color:#fff; font-size:12px; font-weight:700; }
+  .row { display:flex; align-items:center; gap:10px; }
+  .toolbar { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:12px; position:relative; }
+  .tb-more { display:contents; }                  /* desktop: overflow buttons flow inline */
+  .toolbar .tb-more-btn { display:none; }         /* desktop: hide the "More" toggle (beats .btn) */
+  /* quick one-line note on collapsed tasks */
+  .qnote { width:100%; margin-top:5px; border:1px solid transparent; background:transparent; border-radius:7px; padding:3px 7px; font-family:inherit; font-size:13px; color:#475569; }
+  .qnote::placeholder { color:#b6bdc6; }
+  .qnote:hover { border-color:#e2e8f0; }
+  .qnote:focus { border-color:#94a3b8; background:#fff; outline:none; color:#1e293b; }
+  .qnote-prev { display:flex; align-items:center; gap:5px; width:100%; margin-top:5px; border:1px solid transparent; background:transparent; border-radius:7px; padding:3px 7px; font-size:13px; color:#64748b; cursor:pointer; text-align:left; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .qnote-prev:hover { border-color:#e2e8f0; background:#f8fafc; }
+  .qnote-prev .more { color:#94a3b8; flex:0 0 auto; }
+  .btn { display:inline-flex; align-items:center; gap:7px; border:1px solid #e2e8f0; background:#fff; color:#334155; font-weight:600; font-size:13px; padding:8px 13px; border-radius:10px; cursor:pointer; line-height:1; white-space:nowrap; transition:background .15s,border-color .15s,color .15s,transform .05s; box-shadow:0 1px 1px rgba(15,23,42,.03); }
+  .btn:hover { background:#f8fafc; border-color:#cbd5e1; color:#0f172a; }
+  .btn:active { transform:translateY(1px); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn svg { opacity:.65; }
+  .btn:hover svg { opacity:.95; }
+  .btn-primary { color:#fff; border:none; box-shadow:0 2px 6px rgba(99,102,241,.25); }
+  .btn-primary:hover { opacity:.93; }
+  .btn-primary svg { opacity:1; }
+  .warn { display:flex; gap:8px; align-items:flex-start; margin-top:12px; padding:10px 12px; border:1px solid #fde68a; background:#fffbeb; color:#92400e; border-radius:12px; font-size:14px; }
+  .ok { border-color:#a7f3d0; background:#ecfdf5; color:#047857; }
+  .addbox { margin-top:16px; padding:12px; }
+  input, select, textarea { font-family:inherit; font-size:16px; color:#1e293b; }
+  .titleInput { flex:1; min-width:0; border:none; outline:none; background:transparent; font-size:16px; }
+  /* task title: editable but wraps long names instead of clipping */
+  .taskTitle { white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; line-height:1.3; cursor:text; padding:1px 0; }
+  .taskTitle:empty:before { content:"Untitled"; color:#b6bdc6; }
+  .taskTitle.done { text-decoration:line-through; color:#94a3b8; }
+  /* collapse the add-box options until you click into the box */
+  .add-extra { display:none; }
+  .addbox:focus-within .add-extra { display:block; }
+  .chip { display:inline-flex; align-items:center; gap:5px; border:1px solid #e2e8f0; background:#fff; border-radius:9999px; padding:4px 9px; font-size:13px; font-weight:600; color:#64748b; cursor:pointer; }
+  .seg { display:flex; gap:2px; background:#f1f5f9; padding:4px; border-radius:12px; }
+  .seg button { border:none; background:transparent; padding:6px 12px; border-radius:8px; font-size:16px; font-weight:600; color:#64748b; cursor:pointer; }
+  .seg button.active { background:#fff; color:#0f172a; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .field { border:1px solid #e2e8f0; border-radius:8px; padding:6px 8px; background:#fff; outline:none; }
+  .field:focus { border-color:#94a3b8; }
+  .sect { margin-top:20px; }
+  .sect-h { display:flex; align-items:center; justify-content:space-between; padding:0 4px 8px; }
+  .sect-h .left { display:flex; align-items:center; gap:8px; }
+  .sect-h h2 { font-size:16px; margin:0; }
+  .pill { background:#f1f5f9; color:#64748b; border-radius:9999px; padding:1px 8px; font-size:13px; font-weight:600; }
+  .task { display:flex; flex-wrap:wrap; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid #eef0f4; border-left-width:3px; border-radius:12px; background:#fff; margin-bottom:8px; }
+  .task:hover { box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .cb { width:20px; height:20px; border-radius:9999px; border:1px solid #cbd5e1; background:transparent; cursor:pointer; flex:0 0 auto; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .cb.done { background:#10b981; border-color:#10b981; color:#fff; }
+  .meta { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:3px; font-size:13px; }
+  .icon { width:14px; }
+  .iconbtn { display:inline-flex; align-items:center; justify-content:center; border:none; background:transparent; color:#94a3b8; cursor:pointer; width:32px; height:32px; padding:0; border-radius:8px; transition:background .15s,color .15s; }
+  .iconbtn:hover { background:#f1f5f9; color:#334155; }
+  .muted { color:#64748b; }
+  .empty { border:1px dashed #cbd5e1; border-radius:12px; padding:16px; text-align:center; color:#64748b; font-size:13px; }
+  .details { margin-top:10px; padding:12px; border:1px solid #e2e8f0; border-radius:12px; background:#f8fafc; display:grid; gap:10px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.45); display:flex; align-items:center; justify-content:center; padding:16px; z-index:50; }
+  .modal { background:#fff; border-radius:16px; max-width:560px; width:100%; max-height:92vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  .modal-h { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #eef0f4; flex:0 0 auto; }
+  .modal-b { padding:16px; display:grid; gap:12px; overflow-y:auto; }
+  textarea.json { width:100%; height:200px; resize:vertical; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; border:1px solid #e2e8f0; border-radius:12px; padding:8px; }
+  .ev { display:flex; gap:10px; align-items:center; padding:8px 10px; border:1px solid #eef0f4; border-radius:12px; background:#f8fafc; margin-bottom:6px; }
+  .ev .time { min-width:64px; text-align:center; border:1px solid #eef0f4; background:#fff; border-radius:8px; padding:3px 6px; }
+  .toast { position:fixed; left:0; right:0; bottom:16px; display:flex; justify-content:center; z-index:60; }
+  .toast .inner { background:#0f172a; color:#fff; border-radius:12px; padding:10px 16px; font-size:16px; display:flex; gap:12px; align-items:center; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  a.calllink { display:flex; gap:8px; align-items:center; padding:8px 12px; font-size:15px; color:#334155; text-decoration:none; }
+  a.calllink:hover { background:#f8fafc; }
+  .menu { position:absolute; right:0; margin-top:4px; width:230px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.15); overflow:hidden; z-index:30; }
+  .menu button { width:100%; text-align:left; border:none; background:#fff; padding:8px 12px; font-size:15px; color:#334155; cursor:pointer; display:flex; gap:8px; align-items:center; }
+  .menu button:hover { background:#f8fafc; }
+  .menu button:disabled { color:#cbd5e1; cursor:not-allowed; }
+  .selcb { width:22px; height:22px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#fff; flex:0 0 auto; margin-top:1px; font-weight:700; }
+  .selcb.on { background:#3b82f6; border-color:#3b82f6; }
+  .bulkbar { margin-top:12px; padding:10px 14px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; border-color:#bfdbfe; background:#eff6ff; }
+  .lbl { font-size:13px; color:#64748b; }
+  .note-preview { font-size:13px; color:#475569; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; word-break:break-word; line-height:1.5; }
+  .note-preview a, .qnote-prev a { color:#6366f1; text-decoration:underline; word-break:break-all; }
+  .evday { font-size:13px; font-weight:700; text-transform:uppercase; color:#64748b; margin:10px 0 6px; }
+  .btn-danger { color:#dc2626; border-color:#fecaca; }
+  .btn-danger:hover { background:#fef2f2; border-color:#fca5a5; color:#b91c1c; }
+
+  /* ---- compact density (toolbar toggle): tighter rows so more tasks fit on screen ---- */
+  .compact .task { padding:6px 10px; margin-bottom:5px; }
+  .compact .sect { margin-top:12px; }
+  .compact .sect-h { padding-bottom:5px; }
+  .compact .meta { font-size:12px; gap:4px 10px; margin-top:1px; }
+  .compact .qnote, .compact .qnote-prev { margin-top:2px; padding:2px 6px; font-size:12px; }
+  .compact .cb { width:18px; height:18px; }
+  .compact .ev { padding:5px 8px; margin-bottom:4px; }
+  .compact .empty { padding:10px; }
+
+  /* ---- focus visibility (keyboard) ---- */
+  :focus { outline:none; }
+  :focus-visible { outline:2px solid #6366f1; outline-offset:2px; border-radius:6px; }
+  .tab:focus-visible { outline:2px solid #fff; outline-offset:1px; }
+  .field:focus-visible, .titleInput:focus-visible { outline:2px solid #6366f1; outline-offset:0; border-color:#6366f1; }
+  a.calllink:focus-visible, .menu button:focus-visible { outline:2px solid #6366f1; outline-offset:-2px; }
+
+  /* ---- selected task highlight (class so dark mode can override) ---- */
+  .task.sel { background:#eff6ff; border-color:#bfdbfe; }
+
+  /* ---- drag-to-reschedule ---- */
+  .grip { display:flex; align-items:center; justify-content:center; width:20px; align-self:stretch; min-height:26px; border:none; background:transparent; color:#cbd5e1; cursor:grab; padding:0; margin:-2px 2px -2px -4px; border-radius:8px; flex:0 0 auto; }
+  .grip:hover { color:#94a3b8; }
+  .grip:active { cursor:grabbing; }
+  .task.dragging { opacity:.45; }
+  .sect.dropok { background:#eef2ff; outline:2px dashed #6366f1; outline-offset:2px; border-radius:14px; }
+  .task.dropbefore { box-shadow:inset 0 3px 0 0 #6366f1; }
+
+  /* ---- inline meta editing ---- */
+  .metachip { display:inline-flex; align-items:center; gap:5px; border:1px solid transparent; background:transparent; font:inherit; font-size:13px; font-weight:500; padding:2px 6px; border-radius:8px; cursor:pointer; line-height:1.2; }
+  .metachip:hover { background:#f1f5f9; border-color:#e2e8f0; }
+  .editpop { position:absolute; left:0; top:100%; margin-top:6px; z-index:40; background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.16); padding:10px; min-width:220px; display:grid; gap:8px; }
+  .calbtn { color:#6366f1; }
+  .calbtn:hover { background:#eef2ff; color:#4f46e5; }
+
+  /* ---- responsive ---- */
+  @media (max-width:640px){
+    .wrap { padding:16px 14px 64px; }
+    .hdr-inner { padding:14px 16px; }
+    .hdr h1 { font-size:20px; }
+    .hdr-inner > div:first-child { flex:1 1 auto; }
+    .tabs { width:100%; }
+    .tab { flex:1 1 0; justify-content:center; padding:6px 6px; font-size:14px; }
+    .toolbar { justify-content:flex-start; }
+    .grid2 { grid-template-columns:1fr; }
+    .menu { width:min(86vw,230px); }
+    .hide-sm { display:none; }
+    .meta { gap:4px 10px; }
+    .toolbar .tb-more-btn { display:inline-flex; }
+    .tb-more { display:none; position:absolute; right:0; top:calc(100% + 6px); z-index:60; flex-direction:column; align-items:stretch; gap:6px; min-width:212px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:8px; box-shadow:0 12px 30px rgba(0,0,0,.18); }
+    .tb-more.open { display:flex; }
+    .tb-more .btn { justify-content:flex-start; width:100%; }
+    .tb-more .btn .hide-sm { display:inline; }
+  }
+  /* ---- wide screens: show the sticky Today rail beside the main column ---- */
+  @media (min-width:1180px){
+    .wrap { max-width:1560px; }
+    .layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; }
+    .rail { display:block; position:sticky; top:16px; align-self:start; max-height:calc(100vh - 32px); overflow:auto; }
+    .rail-fallback { display:none; } /* Today view's inline calendar — rail covers it on wide screens */
+  }
+
+  /* ---- dark mode ---- */
+  /* warm graphite palette · elevation: bg #1a1917 < field #1c1b19 < card #242220 < overlay #2b2825 */
+  html[data-theme="dark"] { color-scheme:dark; }
+  html[data-theme="dark"] body { background:#1a1917; color:#e8e6e3; }
+  html[data-theme="dark"] .hdr-inner { filter:brightness(.9) saturate(.95); }
+  html[data-theme="dark"] .card { background:#242220; border-color:#38332e; box-shadow:0 1px 3px rgba(0,0,0,.45); }
+  html[data-theme="dark"] .task { background:#242220; border-color:#38332e; }
+  html[data-theme="dark"] .task:hover { box-shadow:0 2px 8px rgba(0,0,0,.5); }
+  html[data-theme="dark"] .task.sel { background:#2e2a1f; border-color:#7c6a3f; }
+  html[data-theme="dark"] input, html[data-theme="dark"] select, html[data-theme="dark"] textarea { color:#e8e6e3; }
+  html[data-theme="dark"] .titleInput { color:#e8e6e3; }
+  html[data-theme="dark"] .field, html[data-theme="dark"] textarea.json { background:#1c1b19; border-color:#443f39; }
+  html[data-theme="dark"] .field:focus { border-color:#818cf8; }
+  html[data-theme="dark"] .btn { background:#2a2724; border-color:#443f39; color:#d6d3d1; box-shadow:none; }
+  html[data-theme="dark"] .btn:hover { background:#353029; border-color:#55504a; color:#fff; }
+  html[data-theme="dark"] .btn-primary { color:#fff; }
+  html[data-theme="dark"] .chip { background:#2a2724; border-color:#443f39; color:#d6d3d1; }
+  html[data-theme="dark"] .seg { background:#1c1b19; }
+  html[data-theme="dark"] .seg button { color:#a8a29e; }
+  html[data-theme="dark"] .seg button.active { background:#353029; color:#fff; }
+  html[data-theme="dark"] .pill { background:#2a2724; color:#d6d3d1; }
+  html[data-theme="dark"] .tb-more { background:#242220; border-color:#38332e; box-shadow:0 12px 30px rgba(0,0,0,.5); }
+  html[data-theme="dark"] .qnote { color:#cdc8c2; }
+  html[data-theme="dark"] .qnote::placeholder { color:#6b6660; }
+  html[data-theme="dark"] .qnote:hover { border-color:#38332e; }
+  html[data-theme="dark"] .qnote:focus { border-color:#818cf8; background:#1c1b19; color:#e8e6e3; }
+  html[data-theme="dark"] .qnote-prev { color:#a8a29e; }
+  html[data-theme="dark"] .qnote-prev:hover { border-color:#38332e; background:#2b2825; }
+  html[data-theme="dark"] .menu { background:#2b2825; border-color:#443f39; }
+  html[data-theme="dark"] .menu button { background:#2b2825; color:#d6d3d1; }
+  html[data-theme="dark"] .menu button:hover { background:#353029; }
+  html[data-theme="dark"] .menu button:disabled { color:#6b635a; }
+  html[data-theme="dark"] .modal { background:#242220; }
+  html[data-theme="dark"] .modal-h { border-color:#38332e; }
+  html[data-theme="dark"] .details { background:#1c1b19; border-color:#38332e; }
+  html[data-theme="dark"] .empty { border-color:#443f39; color:#a8a29e; }
+  html[data-theme="dark"] .ev { background:#1c1b19; border-color:#38332e; }
+  html[data-theme="dark"] .ev .time { background:#242220; border-color:#38332e; }
+  html[data-theme="dark"] a.calllink { color:#d6d3d1; }
+  html[data-theme="dark"] a.calllink:hover { background:#353029; }
+  html[data-theme="dark"] .cb { border-color:#5a5249; }
+  html[data-theme="dark"] .selcb { background:#1c1b19; border-color:#5a5249; }
+  html[data-theme="dark"] .selcb.on { background:#3b82f6; border-color:#3b82f6; }
+  html[data-theme="dark"] .iconbtn { color:#8a827a; }
+  html[data-theme="dark"] .iconbtn:hover { background:#2a2724; color:#d6d3d1; }
+  html[data-theme="dark"] .warn { background:#332a12; border-color:#6b5417; color:#fcd34d; }
+  html[data-theme="dark"] .warn.ok { background:#142a1e; border-color:#1f5a3f; color:#6ee7b7; }
+  html[data-theme="dark"] .bulkbar { background:#2c2820; border-color:#55504a; }
+  html[data-theme="dark"] .muted { color:#a8a29e; }
+  html[data-theme="dark"] .grip { color:#6b635a; }
+  html[data-theme="dark"] .grip:hover { color:#a8a29e; }
+  html[data-theme="dark"] .sect.dropok { background:#2e2a1f; outline-color:#a16207; }
+  html[data-theme="dark"] .metachip:hover { background:#2a2724; border-color:#443f39; }
+  html[data-theme="dark"] .editpop { background:#2b2825; border-color:#443f39; }
+  html[data-theme="dark"] .calbtn { color:#a5b4fc; }
+  html[data-theme="dark"] .calbtn:hover { background:#2a2724; color:#c7d2fe; }
+  html[data-theme="dark"] .lbl { color:#a8a29e; }
+  html[data-theme="dark"] .note-preview { background:#1c1b19; border-color:#38332e; color:#cdc8c2; }
+  html[data-theme="dark"] .note-preview a, html[data-theme="dark"] .qnote-prev a { color:#a5b4fc; }
+  html[data-theme="dark"] .evday { color:#a8a29e; }
+  html[data-theme="dark"] .btn-danger { color:#f87171; border-color:#7f1d2e; }
+  html[data-theme="dark"] .btn-danger:hover { background:#3a1d24; border-color:#9f2535; color:#fca5a5; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+"use strict";
+// ---------------- constants ----------------
+var STORAGE_KEY = "taskhub-html-v1";
+var SCHEMA_VERSION = 2;
+var EVENT_DESC_DEFAULT = "Created from Dust (TaskHub)";
+// NOTE: events are loaded live from the linked taskhub-events.json. The baked snapshot is
+// intentionally empty so this file is safe to host publicly (no calendar data inside it).
+var EVENTS_SYNCED_AT = "";
+var EVENTS_RANGE_LABEL = "";
+var EVENTS_SNAPSHOT = [];
+
+var PRIO = {
+  high:   { label:"High",   dot:"#f43f5e", bg:"#fff1f2", text:"#be123c", border:"#fecdd3", textD:"#fb7185", bgD:"#3a1d24", borderD:"#7f1d2e" },
+  medium: { label:"Medium", dot:"#f59e0b", bg:"#fffbeb", text:"#b45309", border:"#fde68a", textD:"#fbbf24", bgD:"#33290f", borderD:"#7a5c12" },
+  low:    { label:"Low",    dot:"#10b981", bg:"#ecfdf5", text:"#047857", border:"#a7f3d0", textD:"#34d399", bgD:"#0f2e22", borderD:"#15573f" }
+};
+var THEME = {
+  personal: { label:"Personal", grad:"linear-gradient(135deg,#8b5cf6,#ec4899)", soft:"#faf5ff", accent:"#a855f7", softD:"#2a2030", accentD:"#c084fc" },
+  work:     { label:"Work",     grad:"linear-gradient(135deg,#0ea5e9,#14b8a6)", soft:"#f0fdfa", accent:"#0ea5e9", softD:"#10262e", accentD:"#38bdf8" },
+  combined: { label:"All",      grad:"linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9)", soft:"#eef2ff", accent:"#6366f1", softD:"#22243a", accentD:"#818cf8" },
+  today:    { label:"Today",    grad:"linear-gradient(135deg,#f59e0b,#f43f5e)", soft:"#fff7ed", accent:"#ea580c", softD:"#2e2113", accentD:"#fb923c" }
+};
+// theme-aware accent accessors (colors are emitted inline, so pick by mode here)
+function pT(p){ var m=PRIO[p]||PRIO.medium; return darkMode?m.textD:m.text; }
+function pBg(p){ var m=PRIO[p]||PRIO.medium; return darkMode?m.bgD:m.bg; }
+function pBd(p){ var m=PRIO[p]||PRIO.medium; return darkMode?m.borderD:m.border; }
+function lA(l){ return THEME[l]?(darkMode?THEME[l].accentD:THEME[l].accent):"#64748b"; }
+function lS(l){ return THEME[l]?(darkMode?THEME[l].softD:THEME[l].soft):"#f1f5f9"; }
+function odC(){ return darkMode?"#f87171":"#dc2626"; }
+
+var SEED = {
+  sections: [
+    { id:"sec-today", name:"Today", list:"personal" },
+    { id:"sec-soon", name:"This Week", list:"personal" },
+    { id:"sec-inbox", name:"Inbox", list:"work" },
+    { id:"sec-proj", name:"Projects", list:"work" }
+  ],
+  tasks: [
+    { id:"t1", title:"Review weekly goals", list:"personal", sectionId:"sec-today", priority:"medium", dueDate:null, dueTime:null, notes:"", completed:false, createdAt:Date.now()-4000 },
+    { id:"t2", title:"Reply to project emails", list:"work", sectionId:"sec-inbox", priority:"high", dueDate:null, dueTime:null, notes:"", completed:false, createdAt:Date.now()-3000 }
+  ],
+  archive: []
+};
+
+// ---------------- helpers ----------------
+function uid(p){ return p+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7); }
+function pad(n){ return n<10?"0"+n:""+n; }
+function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function addDays(s,n){ var p=s.split("-").map(Number); var d=new Date(p[0],p[1]-1,p[2]+n); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function dowDate(target,allowToday){ var d=new Date(); var dow=d.getDay(); var add=(target-dow+7)%7; if(add===0&&!allowToday)add=7; return addDays(todayStr(),add); }
+function esc(s){ return (s==null?"":""+s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// ---------- notes: hyperlinks (Markdown [label](url) + bare URLs) ----------
+function noteHasLink(text){ return !!text && (/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/.test(text) || /https?:\/\/\S/.test(text)); }
+function linkifyNotes(raw){   // -> safe HTML with clickable links and <br> line breaks
+  raw=(raw==null?"":(""+raw)).replace(/\r\n?/g,"\n");
+  var tokens=[], m;
+  var re1=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;                     // [label](url)
+  while((m=re1.exec(raw))){ tokens.push({start:m.index,end:m.index+m[0].length,label:m[1],url:m[2]}); }
+  var re2=/https?:\/\/[^\s<>()]+/g;                                    // bare url not already inside a [..](..)
+  while((m=re2.exec(raw))){ var bs=m.index,be=bs+m[0].length; if(tokens.some(function(t){return bs<t.end&&be>t.start;}))continue; var url=m[0].replace(/[.,;:!?'"\]]+$/,""); tokens.push({start:bs,end:bs+url.length,label:url,url:url}); }
+  tokens.sort(function(a,b){return a.start-b.start;});
+  var out="", pos=0;
+  tokens.forEach(function(t){ if(t.start<pos)return; out+=esc(raw.slice(pos,t.start)).replace(/\n/g,"<br>"); out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+esc(t.label)+'</a>'; pos=t.end; });
+  out+=esc(raw.slice(pos)).replace(/\n/g,"<br>");
+  return out;
+}
+function notesToPlain(raw){ return (raw==null?"":(""+raw)).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_,label,url){ return label+" ("+url+")"; }); }   // for plain-text targets (calendar)
+function insertLinkAtCursor(ta, after){   // inserts [text](https://) at the caret; selects a placeholder for quick typing
+  try{ ta.focus(); }catch(e){}
+  var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
+  var v=ta.value, sel=v.slice(s,e), label=sel||"link text";
+  ta.value=v.slice(0,s)+"["+label+"](https://)"+v.slice(e);
+  if(sel){ var us=s+label.length+3; ta.setSelectionRange(us, us+8); }   // had text selected -> select the https:// to paste over
+  else { ta.setSelectionRange(s+1, s+1+label.length); }                  // nothing selected -> select the "link text" placeholder
+  if(after) after(ta.value);
+}
+function ic(n,sz){ sz=sz||16; var P={
+ download:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+ upload:'<path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/>',
+ trash:'<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>',
+ calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ note:'<path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5"/>',
+ flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',
+ video:'<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4z"/>',
+ external:'<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M19 13v6H5V5h6"/>',
+ chevdown:'<path d="m6 9 6 6 6-6"/>',
+ chevright:'<path d="m9 6 6 6-6 6"/>',
+ checksq:'<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>',
+ link:'<path d="M9 15 15 9"/><path d="M11 6l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M13 18l-1 1a4 4 0 0 1-6-6l1-1"/>',
+ save:'<path d="M5 3h12l4 4v14H5z"/><path d="M8 3v6h8"/><path d="M8 21v-6h8v6"/>',
+ folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+ check:'<path d="m5 12 5 5 9-11"/>',
+ alert:'<path d="M12 3 2 20h20z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+ search:'<circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/>',
+ x:'<path d="M6 6l12 12M18 6 6 18"/>',
+ undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+ redo:'<path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
+ repeat:'<path d="m17 2 4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/>',
+ moon:'<path d="M21 12.5A8.5 8.5 0 1 1 11.5 3 6.5 6.5 0 0 0 21 12.5z"/>',
+ grip:'<path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/>',
+ calplus:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13.5v5M9.5 16h5"/>',
+ bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+ bell:'<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+ sparkles:'<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="M18 14l.7 2.3 2.3.7-2.3.7L18 20l-.7-2.3-2.3-.7 2.3-.7z"/>',
+ rows:'<path d="M3 6h18M3 12h18M3 18h18"/>'
+ };
+ return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:0 0 auto">'+(P[n]||"")+'</svg>';
+}
+
+var storageOk = true;
+function checkStorage(){ try{ localStorage.setItem("__p","1"); var ok=localStorage.getItem("__p")==="1"; localStorage.removeItem("__p"); return ok; }catch(e){ return false; } }
+function load(){ try{ var r=localStorage.getItem(STORAGE_KEY); if(!r) return clone(SEED); var p=JSON.parse(r); return { tasks:Array.isArray(p.tasks)?p.tasks:[], sections:Array.isArray(p.sections)?p.sections:[], archive:Array.isArray(p.archive)?p.archive:[] }; }catch(e){ return clone(SEED); } }
+function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }catch(e){} if(fileHandle){ writeToFile(); } }
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function buildDate(ds,ts){ var p=ds.split("-").map(Number); var hh=9,mm=0; if(ts){ var t=ts.split(":"); hh=+t[0]; mm=+t[1]; } return new Date(p[0],p[1]-1,p[2],hh,mm,0); }
+function fmtDue(ds,ts){ if(!ds) return ""; var dt=buildDate(ds,ts); var t0=new Date(); t0.setHours(0,0,0,0); var tg=new Date(dt); tg.setHours(0,0,0,0); var diff=Math.round((tg-t0)/86400000); var day; if(diff===0)day="Today"; else if(diff===1)day="Tomorrow"; else if(diff===-1)day="Yesterday"; else day=dt.toLocaleDateString(undefined,{month:"short",day:"numeric"}); if(ts){ return day+", "+dt.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); } return day; }
+function fmtStamp(ts){ if(!ts) return ""; var d=new Date(ts); var t0=new Date(); t0.setHours(0,0,0,0); var dg=new Date(d); dg.setHours(0,0,0,0); var diff=Math.round((dg-t0)/86400000); if(diff===0)return "Today"; if(diff===-1)return "Yesterday"; var sameYr=d.getFullYear()===new Date().getFullYear(); return d.toLocaleDateString(undefined, sameYr?{month:"short",day:"numeric"}:{year:"numeric",month:"short",day:"numeric"}); }
+function overdue(t){ if(!t.dueDate||t.completed) return false; var due; if(t.dueTime){ due=buildDate(t.dueDate,t.dueTime).getTime(); } else { var p=t.dueDate.split("-").map(Number); due=new Date(p[0],p[1]-1,p[2],23,59,59,999).getTime(); } return due<Date.now(); }
+
+// ---------- date buckets (replace manual sections) ----------
+var BUCKETS=[{k:"nodue",name:"No Due Date"},{k:"earlier",name:"Earlier"},{k:"today",name:"Today"},{k:"tomorrow",name:"Tomorrow"},{k:"later",name:"Later"}];
+function bucketOf(t){ if(!t.dueDate) return "nodue"; var tk=todayStr(); var tm=addDays(tk,1); if(t.dueDate<tk) return "earlier"; if(t.dueDate===tk) return "today"; if(t.dueDate===tm) return "tomorrow"; return "later"; }
+function bucketDate(key){ var tk=todayStr(); if(key==="today")return tk; if(key==="tomorrow")return addDays(tk,1); if(key==="later")return addDays(tk,2); if(key==="earlier")return addDays(tk,-1); return null; }
+
+// ---------- recurrence ----------
+var RECUR_LABEL = { none:"Does not repeat", daily:"Daily", weekdays:"Every weekday", weekly:"Weekly", monthly:"Monthly", yearly:"Annually" };
+function nextRecur(dateStr, recur){
+  if(!dateStr) return dateStr;
+  if(recur==="daily") return addDays(dateStr,1);
+  if(recur==="weekly") return addDays(dateStr,7);
+  if(recur==="weekdays"){ var nd=addDays(dateStr,1); var q=nd.split("-").map(Number); var wd=new Date(q[0],q[1]-1,q[2]).getDay(); if(wd===6)nd=addDays(nd,2); else if(wd===0)nd=addDays(nd,1); return nd; }
+  if(recur==="monthly"){ var p=dateStr.split("-").map(Number); var yr=p[0], nmIdx=p[1]; if(nmIdx>11){ nmIdx=0; yr++; } var dim=new Date(yr, nmIdx+1, 0).getDate(); var day=Math.min(p[2], dim); var dt=new Date(yr, nmIdx, day); return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate()); }
+  if(recur==="yearly"){ var q=dateStr.split("-").map(Number); var ny=q[0]+1, mIdx=q[1]-1; var ldim=new Date(ny, mIdx+1, 0).getDate(); var yday=Math.min(q[2], ldim); var ydt=new Date(ny, mIdx, yday); return ydt.getFullYear()+"-"+pad(ydt.getMonth()+1)+"-"+pad(ydt.getDate()); }   // +1 year; Feb 29 -> Feb 28 in non-leap years
+  return addDays(dateStr,1);
+}
+
+// ---------- 15-minute time picker (select, so only :00/:15/:30/:45 are offered) ----------
+function fmt12(v){ var p=(""+v).split(":"); var h=(+p[0])%12; if(h===0)h=12; return h+":"+p[1]+" "+((+p[0])<12?"AM":"PM"); }
+function timeOptionsHTML(sel){ sel=sel||""; var aligned = sel==="" || /^[0-2]?\d:(00|15|30|45)$/.test(sel); var html='<option value=""'+(sel===""?" selected":"")+'>No time</option>'; if(sel && !aligned){ html+='<option value="'+esc(sel)+'" selected>'+esc(fmt12(sel))+'</option>'; } for(var h=0;h<24;h++){ for(var mq=0;mq<60;mq+=15){ var v=pad(h)+":"+pad(mq); html+='<option value="'+v+'"'+(v===sel?" selected":"")+'>'+esc(fmt12(v))+'</option>'; } } return html; }
+function timeSelect(value, disabled, onPick){ var s=el('<select class="field" aria-label="Due time"'+(disabled?" disabled":"")+'>'+timeOptionsHTML(value)+'</select>'); s.onchange=function(){ onPick(s.value||null); }; return s; }
+
+// ---------- ICS / calendar links ----------
+function utc(dt){ return dt.getUTCFullYear()+pad(dt.getUTCMonth()+1)+pad(dt.getUTCDate())+"T"+pad(dt.getUTCHours())+pad(dt.getUTCMinutes())+pad(dt.getUTCSeconds())+"Z"; }
+function icsLocal(dt){ return dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate())+"T"+pad(dt.getHours())+pad(dt.getMinutes())+pad(dt.getSeconds()); }
+function dOnly(s){ return s.replace(/-/g,""); }
+function escICS(s){ return (s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
+function buildICS(t,mode){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dust//TaskHub//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:"+t.id+"@dust-taskhub","DTSTAMP:"+utc(new Date()),"SUMMARY:"+escICS(t.title),"DESCRIPTION:"+escICS(desc)]; if(mode==="block"&&t.dueDate){ var s=buildDate(t.dueDate,t.dueTime); var e=new Date(s.getTime()+3600000); L.push("DTSTART:"+icsLocal(s)); L.push("DTEND:"+icsLocal(e)); } else if(t.dueDate){ L.push("DTSTART;VALUE=DATE:"+dOnly(t.dueDate)); L.push("DTEND;VALUE=DATE:"+dOnly(addDays(t.dueDate,1))); L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+escICS(t.title),"TRIGGER:-PT9H","END:VALARM"); } L.push("END:VEVENT","END:VCALENDAR"); return L.join("\r\n"); }
+function downloadText(content, filename){ var blob=new Blob([content],{type:"text/plain"}); var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }
+function gcalUrl(t){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var p=["text="+encodeURIComponent(t.title),"details="+encodeURIComponent(desc)]; if(t.dueDate){ if(t.dueTime){ var s=buildDate(t.dueDate,t.dueTime); var e=new Date(s.getTime()+3600000); p.push("dates="+utc(s)+"/"+utc(e)); } else { p.push("dates="+dOnly(t.dueDate)+"/"+dOnly(addDays(t.dueDate,1))); } } return "https://calendar.google.com/calendar/render?action=TEMPLATE&"+p.join("&"); }
+function outlookUrl(t){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var p=["subject="+encodeURIComponent(t.title),"body="+encodeURIComponent(desc)]; if(t.dueDate){ var s=buildDate(t.dueDate,t.dueTime); if(t.dueTime){ var e=new Date(s.getTime()+3600000); p.push("startdt="+encodeURIComponent(s.toISOString())); p.push("enddt="+encodeURIComponent(e.toISOString())); } else { p.push("startdt="+t.dueDate); p.push("enddt="+addDays(t.dueDate,1)); p.push("allday=true"); } } return "https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&"+p.join("&"); }
+
+// ---------------- File System Access (auto-save to local file) ----------------
+var fileHandle = null;
+var dataNeedsPermission = false;   // handle restored but write permission not yet (re)granted this session
+var fsSupported = (typeof window.showSaveFilePicker === "function");
+async function linkFile(){
+  try {
+    fileHandle = await window.showSaveFilePicker({ suggestedName:"taskhub-data.json", types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    dataNeedsPermission=false;
+    await idbHandle("put", "data", fileHandle);   // remember it so it auto-reconnects next time
+    await writeToFile(); toast("Linked - changes now auto-save (and reconnect automatically)");
+  } catch(e){ /* cancelled */ }
+  render();
+}
+async function openFile(){
+  try {
+    var hs = await window.showOpenFilePicker({ types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    fileHandle = hs[0]; dataNeedsPermission=false;
+    await idbHandle("put", "data", fileHandle);
+    var f = await fileHandle.getFile(); var txt = await f.text();
+    doImport(txt, true); toast("Loaded from file - auto-save linked");
+  } catch(e){ /* cancelled */ }
+  render();
+}
+async function writeToFile(){
+  if(!fileHandle) return;
+  try {
+    if(!(await ensurePerm(fileHandle,"readwrite"))){ dataNeedsPermission=true; return; }
+    dataNeedsPermission=false;
+    var w = await fileHandle.createWritable(); await w.write(exportJson()); await w.close();
+  }
+  catch(e){ toast("Could not write to file (permission?)"); }
+}
+async function restoreDataHandle(){
+  if(!fsSupported) return;
+  var h=await idbHandle("get", "data"); if(!h || typeof h.createWritable!=="function") return;
+  fileHandle=h;
+  try{ if((await h.queryPermission({mode:"readwrite"}))!=="granted") dataNeedsPermission=true; }catch(e){ dataNeedsPermission=true; }
+  render();
+}
+async function reconnectData(){ if(!fileHandle) return; if(await ensurePerm(fileHandle,"readwrite")){ dataNeedsPermission=false; await writeToFile(); toast("Auto-save reconnected"); } render(); }
+
+// ---- link / reconnect everything at once (data + events + AI inbox) ----
+function parseJSONsafe(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
+async function linkDataHandle(){
+  // establish read/write, then reconcile direction so neither side's tasks are lost
+  if(!(await ensurePerm(fileHandle,"readwrite"))){ dataNeedsPermission=true; return; }
+  dataNeedsPermission=false;
+  var txt=""; try{ var fd=await fileHandle.getFile(); txt=await fd.text(); }catch(e){}
+  var parsed=parseJSONsafe(txt);
+  var fileTasks=(parsed&&Array.isArray(parsed.tasks))?parsed.tasks.filter(function(t){return t&&!t.deletedAt;}).length:0;
+  var appTasks=store.tasks.filter(function(t){return !t.deletedAt;}).length;
+  if(fileTasks>0 && appTasks>0){
+    var useFile=confirm("Link data file\n\nThis device has "+appTasks+" task"+(appTasks===1?"":"s")+"; the file has "+fileTasks+".\n\nOK = use the FILE (replace this device's tasks)\nCancel = keep THIS DEVICE (overwrite the file)");
+    if(useFile){ doImport(txt, true); } else { await writeToFile(); }
+  } else if(fileTasks>0){ doImport(txt, true); }   // file has data, device empty -> load it
+  else { await writeToFile(); }                     // device has data (or both empty) -> write it
+}
+async function linkAll(){
+  if(!fsSupported) return;
+  try{
+    var hs=await window.showOpenFilePicker({ multiple:true, types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    var got=[];
+    for(var i=0;i<hs.length;i++){
+      var h=hs[i]; var nm=(h.name||"").toLowerCase();
+      if(nm.indexOf("event")>=0){ eventsHandle=h; eventsNeedsReconnect=false; await idbHandle("put","events",h); got.push("events"); }
+      else if(nm.indexOf("inbox")>=0){ inboxHandle=h; inboxNeedsReconnect=false; await idbHandle("put","inbox",h); got.push("AI inbox"); }
+      else { fileHandle=h; dataNeedsPermission=false; await idbHandle("put","data",h); got.push("data"); }
+    }
+    if(got.indexOf("data")>=0){ await linkDataHandle(); }
+    if(eventsHandle && got.indexOf("events")>=0) await readEvents(true);
+    if(inboxHandle && got.indexOf("AI inbox")>=0) await readInbox(true);
+    toast(got.length?("Linked "+got.join(" + ")):"No files selected - pick your taskhub-*.json files");
+  }catch(e){ /* cancelled */ }
+  render();
+}
+function rcNeeded(){ return fsSupported && ((fileHandle&&dataNeedsPermission)||(eventsHandle&&eventsNeedsReconnect)||(inboxHandle&&inboxNeedsReconnect)); }
+async function reconnectAll(){
+  var done=[];
+  // data first (it needs the readwrite grant). Each requestPermission needs a fresh user gesture,
+  // and on file:// the browser usually allows only one prompt per click — so we report what's left.
+  if(fileHandle && dataNeedsPermission){ if(await ensurePerm(fileHandle,"readwrite")){ dataNeedsPermission=false; await writeToFile(); done.push("auto-save"); } }
+  if(eventsHandle && eventsNeedsReconnect){ await readEvents(true); if(!eventsNeedsReconnect) done.push("events"); }
+  if(inboxHandle && inboxNeedsReconnect){ await readInbox(true); if(!inboxNeedsReconnect) done.push("AI inbox"); }
+  if(done.length && rcNeeded()) toast("Reconnected "+done.join(" + ")+" — tap Reconnect all again to finish the rest");
+  else if(done.length) toast("Reconnected "+done.join(" + "));
+  else toast("Nothing needed reconnecting");
+  render();
+}
+
+// ---------------- Events sync (inbound: Power Automate writes Outlook → JSON; we read it) ----------------
+var eventsHandle = null;     // FileSystemFileHandle for taskhub-events.json (read)
+var liveEvents = null;       // parsed events from the file (null = use baked snapshot)
+var eventsMeta = null;       // {syncedAt, rangeLabel} from the file
+var eventsNeedsReconnect = false;
+
+function idbHandle(method, key, val){
+  return new Promise(function(res){
+    try{
+      var open=indexedDB.open("taskhub-fs",1);
+      open.onupgradeneeded=function(){ try{ open.result.createObjectStore("h"); }catch(e){} };
+      open.onerror=function(){ res(null); };
+      open.onsuccess=function(){ try{ var db=open.result; var tx=db.transaction("h", method==="get"?"readonly":"readwrite"); var st=tx.objectStore("h"); var rq=method==="get"?st.get(key):st.put(val,key); rq.onsuccess=function(){ res(rq.result); }; rq.onerror=function(){ res(null); }; }catch(e){ res(null); } };
+    }catch(e){ res(null); }
+  });
+}
+async function ensurePerm(h, mode){ try{ var o={mode:mode||"read"}; if((await h.queryPermission(o))==="granted") return true; if((await h.requestPermission(o))==="granted") return true; }catch(e){} return false; }
+
+function hasTZ(s){ return /[Zz]$|[+\-]\d\d:?\d\d$/.test(""+s); }   // ISO string carries a UTC offset / Z
+function fmtClockFromISO(iso){
+  var s=""+iso;
+  if(hasTZ(s)){ var d=new Date(s); if(!isNaN(d.getTime())) return d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }  // offset-aware -> local time
+  var m=s.match(/T(\d\d):(\d\d)/); if(!m) return s; var h=+m[1], mm=m[2]; var ap=h<12?"AM":"PM"; var hr=h%12; if(hr===0)hr=12; return hr+":"+mm+" "+ap;
+}
+function localDateFromISO(s){ if(hasTZ(s)){ var d=new Date(s); if(!isNaN(d.getTime())) return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); } return (""+s).slice(0,10); }
+function isISO(x){ return typeof x==="string" && /^\d{4}-\d{2}-\d{2}T/.test(x); }
+function datePart(x){ return (isISO(x)||(typeof x==="string"&&/^\d{4}-\d{2}-\d{2}/.test(x))) ? (""+x).slice(0,10) : null; }
+function normEvents(e){   // returns an array (all-day events that span multiple days produce one entry per day)
+  if(!e || (typeof e.title!=="string" && typeof e.subject!=="string")) return [];
+  var title=String(e.title||e.subject);
+  var teams=!!(e.teams||e.isOnlineMeeting);
+  var showAs=(typeof e.showAs==="string" && SHOWAS[e.showAs]) ? e.showAs : "busy";
+  if(e.allDay || e.isAllDay){
+    // floating dates: use the literal date portion (NO timezone conversion); end is exclusive (Outlook)
+    var sd=e.date || datePart(e.start); if(!sd) return [];
+    var ed=datePart(e.end);
+    var out=[];
+    if(ed && ed>sd){ var d=sd, guard=0; while(d<ed && guard<60){ out.push({title:title,date:d,allDay:true,start:null,end:null,teams:teams,showAs:showAs}); d=addDays(d,1); guard++; } }
+    else { out.push({title:title,date:sd,allDay:true,start:null,end:null,teams:teams,showAs:showAs}); }
+    return out;
+  }
+  // timed event: offset-aware local time/date
+  var date=e.date, start=(e.start!=null?e.start:null), end=(e.end!=null?e.end:null);
+  if(isISO(start)){ if(!date) date=localDateFromISO(start); start=fmtClockFromISO(start); }
+  if(isISO(end)){ end=fmtClockFromISO(end); }
+  if(!date) return [];
+  return [{ title:title, date:String(date), allDay:false, start:start||null, end:end||null, teams:teams, showAs:showAs }];
+}
+function parseEventsPayload(text){
+  var parsed=JSON.parse(text);
+  var arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.events) ? parsed.events : null);
+  if(!arr) throw new Error("No events array found.");
+  var evs=[]; arr.forEach(function(e){ normEvents(e).forEach(function(n){ evs.push(n); }); });
+  var meta = Array.isArray(parsed) ? {} : parsed;
+  return { events:evs, syncedAt: meta.syncedAt||null, rangeLabel: meta.rangeLabel||null };
+}
+async function readEvents(silent){
+  if(!eventsHandle) return;
+  try{
+    if(!(await ensurePerm(eventsHandle,"read"))){ eventsNeedsReconnect=true; render(); return; }
+    var f=await eventsHandle.getFile(); var txt=await f.text();
+    var p=parseEventsPayload(txt);
+    liveEvents=p.events;
+    eventsMeta={ syncedAt: p.syncedAt || new Date(f.lastModified).toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}), rangeLabel: p.rangeLabel };
+    eventsNeedsReconnect=false; render();
+    if(!silent) toast("Synced "+liveEvents.length+" event"+(liveEvents.length===1?"":"s")+" from Outlook");
+  }catch(e){ if(!silent) toast("Could not read events file"); }
+}
+async function connectEventsFile(){
+  try{
+    var hs=await window.showOpenFilePicker({ types:[{description:"JSON",accept:{"application/json":[".json"]}}] });
+    eventsHandle=hs[0]; await idbHandle("put", "events", eventsHandle); await readEvents(false);
+  }catch(e){ /* cancelled */ }
+}
+async function restoreEventsHandle(){
+  if(!fsSupported) return;
+  var h=await idbHandle("get", "events"); if(!h || typeof h.queryPermission!=="function" || typeof h.getFile!=="function") return; eventsHandle=h;
+  try{ if((await h.queryPermission({mode:"read"}))==="granted"){ await readEvents(true); } else { eventsNeedsReconnect=true; render(); } }catch(e){}
+}
+function eventsList(){ return liveEvents || EVENTS_SNAPSHOT; }
+function evSyncedAt(){ return (eventsMeta && eventsMeta.syncedAt) || EVENTS_SYNCED_AT; }
+function evRangeLabel(){ return (eventsMeta && eventsMeta.rangeLabel) || EVENTS_RANGE_LABEL; }
+
+// ---------------- AI inbox (a Dust agent writes a change-set; we ingest & merge) ----------------
+// The agent READS taskhub-data.json (current tasks + ids) and WRITES taskhub-inbox.json (ops).
+// Safe ops (add/complete/uncomplete) auto-apply; risky ops (update/reschedule/delete) queue for review.
+var inboxHandle = null;          // FileSystemFileHandle for taskhub-inbox.json (read)
+var inboxNeedsReconnect = false;
+var inboxPending = [];           // risky ops awaiting your review (each carries _k)
+var inboxLastBatch = null;       // {batchId, generatedAt, count} from the last read
+var INBOX_LEDGER_KEY = "taskhub-inbox-ledger-v1";
+var inboxDone = (function(){ try{ var a=JSON.parse(localStorage.getItem(INBOX_LEDGER_KEY)||"[]"); return Array.isArray(a)?a:[]; }catch(e){ return []; } })();
+function saveInboxLedger(){ try{ if(inboxDone.length>1000) inboxDone=inboxDone.slice(inboxDone.length-1000); localStorage.setItem(INBOX_LEDGER_KEY, JSON.stringify(inboxDone)); }catch(e){} }
+function hashStr(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return ""+h; }
+function inboxKey(op, batchId, idx){ if(op && typeof op.opId==="string" && op.opId) return "id:"+op.opId; if(batchId) return "b:"+batchId+"#"+idx; return "h:"+hashStr(JSON.stringify(op)); }
+var SAFE_INBOX_ACTIONS = { add:1, complete:1, uncomplete:1 };
+function isSafeInboxOp(op){ return !!SAFE_INBOX_ACTIONS[op.action]; }
+function inboxPendingHas(k){ for(var i=0;i<inboxPending.length;i++){ if(inboxPending[i]._k===k) return true; } return false; }
+
+function inboxFindTarget(m){
+  if(!m || typeof m!=="object") return null;
+  if(m.id){ var byId=store.tasks.filter(function(t){return t.id===m.id;})[0]; if(byId) return byId; }
+  if(m.title){ var tl=(""+m.title).trim().toLowerCase(); var list=(m.list!=null)?(""+m.list).toLowerCase():null;
+    var cands=store.tasks.filter(function(t){ return !t.deletedAt && (""+t.title).trim().toLowerCase()===tl && (!list||t.list===list); });
+    if(cands.length===1) return cands[0]; }
+  return null;
+}
+function inboxCoerce(s){   // -> validated patch containing only recognized task fields
+  var p={}; if(!s || typeof s!=="object") return p;
+  if(typeof s.title==="string" && s.title.trim()) p.title=s.title.trim();
+  if(s.list!=null){ var l=(""+s.list).toLowerCase(); if(l==="work"||l==="personal") p.list=l; }
+  if(s.priority!=null){ var pr=(""+s.priority).toLowerCase(); if(pr==="high"||pr==="medium"||pr==="low") p.priority=pr; }
+  if(typeof s.notes==="string") p.notes=s.notes;
+  if("dueDate" in s){ if(s.dueDate===null||s.dueDate===false||s.dueDate==="") p.dueDate=null; else if(/^\d{4}-\d{2}-\d{2}$/.test(""+s.dueDate)) p.dueDate=""+s.dueDate; }
+  if(typeof s.dueTime==="string" && /^\d{1,2}:\d{2}$/.test(s.dueTime)) p.dueTime=s.dueTime;
+  if(s.remind===false) p.dueTime=null;
+  if(s.remind===true && !("dueTime" in p)) p.dueTime="09:00";
+  return p;
+}
+function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — permanent:true = never retry this op
+  var a=op.action;
+  if(a==="add"){
+    var p=inboxCoerce(op.task||{});
+    if(!p.title) return {ok:false, permanent:true, desc:"Add skipped (no title)"};
+    // optional caller-supplied id (used by integrations like the To Do inbound flow so the
+    // next outbound run matches by [taskhub:id] and never duplicates); guard against collisions
+    var givenId = (op.task && typeof op.task.id==="string" && op.task.id) ? op.task.id : (typeof op.id==="string" && op.id ? op.id : null);
+    if(givenId && store.tasks.filter(function(t){return t.id===givenId;}).length) return {ok:false, permanent:true, desc:"Add skipped (id exists)"};
+    var tag="[ai]"+(op.source?(" "+op.source):""); var notes=(p.notes||"").trim(); notes = notes ? (notes+"\n\n"+tag) : tag;
+    var dd=p.dueDate||null;
+    store.tasks.push({ id:givenId||uid("t"), title:p.title, list:p.list||"work", sectionId:null, priority:p.priority||"medium", dueDate:dd, dueTime:(dd?(p.dueTime||null):null), notes:notes, completed:false, completedAt:null, recur:"none", deletedAt:null, createdAt:Date.now() });
+    return {ok:true, desc:"Added “"+p.title+"”"};
+  }
+  var t=inboxFindTarget(op.match);
+  if(!t) return {ok:false, permanent:false, desc:(a||"op")+" skipped (no matching task yet — will retry)"};
+  if(a==="complete"||a==="uncomplete"){ var done=(a==="complete");
+    // use the completion time the source supplied (e.g. the exact To Do tap time) if present, else now
+    var doneAt = done ? (op.completedAt!=null ? (typeof op.completedAt==="number"?op.completedAt:(new Date(op.completedAt).getTime()||Date.now())) : Date.now()) : null;
+    store.tasks=store.tasks.map(function(x){ return x.id===t.id?Object.assign({},x,{completed:done, completedAt: doneAt}):x; }); return {ok:true, desc:(done?"Completed “":"Reopened “")+t.title+"”"}; }
+  if(a==="delete"){ store.tasks=store.tasks.map(function(x){ return x.id===t.id?Object.assign({},x,{deletedAt:Date.now(),completed:false}):x; }); return {ok:true, desc:"Deleted “"+t.title+"”"}; }
+  if(a==="update"||a==="reschedule"){ var patch=inboxCoerce(op.set||{}); var merged=Object.assign({},t,patch); if(!merged.dueDate) merged.dueTime=null; store.tasks=store.tasks.map(function(x){ return x.id===t.id?merged:x; }); return {ok:true, desc:(a==="reschedule"?"Rescheduled “":"Updated “")+t.title+"”"}; }
+  return {ok:false, permanent:true, desc:"Unknown action: "+a};
+}
+function processInbox(data, silent){
+  var batchId = (data && typeof data.batchId==="string") ? data.batchId : null;
+  var rawOps = Array.isArray(data) ? data : (data && Array.isArray(data.ops) ? data.ops : null);
+  if(!rawOps){ if(!silent) toast("AI inbox has no \"ops\" list"); render(); return; }
+  inboxLastBatch = { batchId:batchId, generatedAt:(data&&data.generatedAt)||null, count:rawOps.length };
+  var fresh=[];
+  rawOps.forEach(function(op, idx){ if(!op || typeof op!=="object" || !op.action) return; var k=inboxKey(op, batchId, idx); if(inboxDone.indexOf(k)>=0) return; if(inboxPendingHas(k)) return; op._k=k; fresh.push(op); });
+  if(!fresh.length){ if(!silent) toast("No new AI changes"); render(); return; }
+  var safe=fresh.filter(isSafeInboxOp), risky=fresh.filter(function(o){ return !isSafeInboxOp(o); });
+  var applied=0, deferred=0;
+  if(safe.length){
+    pushHistory();
+    safe.forEach(function(op){
+      var r=inboxApply(op);
+      if(r.ok){ applied++; inboxDone.push(op._k); }
+      else if(r.permanent){ inboxDone.push(op._k); }          // will never succeed — don't retry
+      else { deferred++; }                                    // no match YET (e.g. complete before its add synced) — retry next read
+    });
+    if(applied){ save(); } else { undoStack.pop(); }          // drop the no-op history snapshot
+  }
+  risky.forEach(function(op){ inboxPending.push(op); });
+  saveInboxLedger(); render();
+  if(risky.length && !silent) openModal("aiReview");
+  var extra=(risky.length?" · "+risky.length+" to review":"")+(deferred?" · "+deferred+" retrying later":"");
+  if(applied){ toast("Applied "+applied+" AI change"+(applied===1?"":"s")+extra, {label:"Undo", fn:doUndo}); }
+  else if(risky.length){ toast(risky.length+" AI suggestion"+(risky.length===1?"":"s")+" to review", {label:"Review", fn:function(){ openModal("aiReview"); }}); }
+  else if(deferred){ if(!silent) toast(deferred+" AI change"+(deferred===1?"":"s")+" waiting for a matching task — will retry on the next check"); }
+  else if(!silent){ toast("No new AI changes"); }
+}
+async function readInbox(silent){
+  if(!inboxHandle) return;
+  try{
+    if(!(await ensurePerm(inboxHandle,"read"))){ inboxNeedsReconnect=true; render(); return; }
+    var f=await inboxHandle.getFile(); var txt=await f.text();
+    inboxNeedsReconnect=false;
+    if(!txt.trim()){ if(!silent) toast("AI inbox is empty"); render(); return; }
+    var data; try{ data=JSON.parse(txt); }catch(e){ if(!silent) toast("AI inbox isn't valid JSON"); render(); return; }
+    processInbox(data, silent);
+  }catch(e){ if(!silent) toast("Could not read AI inbox"); }
+}
+async function connectInboxFile(){ try{ var hs=await window.showOpenFilePicker({ types:[{description:"JSON",accept:{"application/json":[".json"]}}] }); inboxHandle=hs[0]; await idbHandle("put","inbox",inboxHandle); await readInbox(false); }catch(e){} }
+async function restoreInboxHandle(){ if(!fsSupported) return; var h=await idbHandle("get","inbox"); if(!h || typeof h.getFile!=="function") return; inboxHandle=h; try{ if((await h.queryPermission({mode:"read"}))==="granted"){ await readInbox(true); } else { inboxNeedsReconnect=true; render(); } }catch(e){} }
+function inboxResolve(op, apply){
+  var idx=-1; for(var i=0;i<inboxPending.length;i++){ if(inboxPending[i]._k===op._k){ idx=i; break; } }
+  if(idx<0) return;
+  if(apply){ pushHistory(); var r=inboxApply(op); save(); toast(r.desc); }
+  inboxDone.push(op._k); saveInboxLedger(); inboxPending.splice(idx,1);
+  if(!inboxPending.length && modal==="aiReview") modal=null;
+  render();
+}
+function inboxResolveAll(apply){
+  if(!inboxPending.length) return;
+  if(apply){ pushHistory(); var n=0; inboxPending.forEach(function(op){ if(inboxApply(op).ok) n++; inboxDone.push(op._k); }); save(); toast("Applied "+n+" change"+(n===1?"":"s")); }
+  else { inboxPending.forEach(function(op){ inboxDone.push(op._k); }); toast("Discarded "+inboxPending.length+" suggestion"+(inboxPending.length===1?"":"s")); }
+  inboxPending=[]; saveInboxLedger(); modal=null; render();
+}
+var INBOX_SCHEMA = JSON.stringify({
+  type:"object",
+  properties:{
+    batchId:{type:"string"},
+    generatedAt:{type:"string"},
+    ops:{ type:"array", items:{ type:"object", properties:{
+      opId:{type:"string"},
+      action:{type:"string", enum:["add","update","reschedule","complete","uncomplete","delete"]},
+      task:{type:"object", properties:{ id:{type:"string"}, title:{type:"string"}, list:{type:"string"}, priority:{type:"string"}, dueDate:{}, dueTime:{}, remind:{type:"boolean"}, notes:{type:"string"} }},
+      match:{type:"object", properties:{ id:{type:"string"}, title:{type:"string"}, list:{type:"string"} }},
+      set:{type:"object"},
+      source:{type:"string"},
+      reason:{type:"string"}
+    }, required:["opId","action"] } }
+  },
+  required:["ops"]
+}, null, 2);
+function inboxSample(){ return JSON.stringify({
+  version:1, batchId:"b-sample", generatedAt:new Date().toISOString(),
+  ops:[
+    { opId:"op-1", action:"add", source:"Teams: Staffing Sync 6/5", task:{ title:"Draft Q3 staffing plan", list:"work", priority:"high", dueDate:"2026-06-09", remind:false, notes:"Action item from staffing sync" } },
+    { opId:"op-2", action:"complete", match:{ id:"PASTE_A_REAL_TASK_ID" }, source:"You said it's done" },
+    { opId:"op-3", action:"reschedule", match:{ id:"PASTE_A_REAL_TASK_ID" }, set:{ dueDate:"2026-06-12" }, reason:"Client pushed the review a week" }
+  ]
+}, null, 2); }
+
+// ---------------- export / import ----------------
+// Power Automate / Microsoft To Do feed: each task pre-mapped to the fields the
+// To Do connector wants, incl. a reminder time so To Do fires the notification.
+var IMPORTANCE = { high:"high", medium:"normal", low:"low" };
+function tzName(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; }catch(e){ return "UTC"; } }
+// reminder instant in UTC (To Do/Graph reads dateTimes as UTC; we send the true instant so it lands at the right local time)
+function toUtcInstant(dateStr, timeStr){ var p=dateStr.split("-").map(Number); var tp=(timeStr||"00:00").split(":"); var d=new Date(p[0],p[1]-1,p[2], +tp[0], +(tp[1]||0), 0); return d.toISOString(); }
+function buildTodoFeed(){
+  var tz=tzName();
+  return store.tasks.filter(function(t){return !t.deletedAt;}).map(function(t){
+    var hasDate=!!t.dueDate;
+    var hasRem = hasDate && !!t.dueTime;           // reminder only when a time is set
+    // due date is date-only in To Do; send noon UTC so it never shifts a day across time zones
+    var due = hasDate ? (t.dueDate + "T12:00:00Z") : null;
+    // reminder is the real instant in UTC (local date+time converted)
+    var rem = hasRem ? toUtcInstant(t.dueDate, t.dueTime) : null;
+    var body = linkifyNotes((t.notes||"").trim());   // To Do body is HTML: escapes, turns links into anchors, \n -> <br>
+    // visible recurrence marker (To Do has no native repeat field via the connector; this just shows it repeats)
+    var recurLine = (t.recur && t.recur!=="none") ? ("🔁 Repeats "+(RECUR_LABEL[t.recur]||"").toLowerCase()) : "";
+    var parts=[]; if(body) parts.push(body); if(recurLine) parts.push(recurLine); parts.push("[taskhub:"+t.id+"]");
+    body = parts.join("<br><br>");
+    return {
+      id: t.id,
+      title: t.title,
+      list: (THEME[t.list] && THEME[t.list].label) || t.list,
+      importance: IMPORTANCE[t.priority] || "normal",
+      status: t.completed ? "completed" : "notStarted",
+      isReminderOn: hasRem,
+      dueDateTime: due,          // UTC, date-only (noon)
+      reminderDateTime: rem,     // UTC instant, or null when no reminder
+      timeZone: tz,
+      bodyContent: body,
+      dueDate: t.dueDate || null,
+      dueTime: t.dueTime || null
+    };
+  });
+}
+function exportJson(){
+  // deletedIds drives the To Do delete loop: trashed tasks + recently archived ones (older
+  // archive ids age out after 30 days so the flow's per-id lookups don't grow forever)
+  var delIds=store.tasks.filter(function(t){return !!t.deletedAt;}).map(function(t){return t.id;});
+  var archCut=Date.now()-30*86400000;
+  (store.archive||[]).forEach(function(t){ if(t.archivedAt && t.archivedAt>archCut) delIds.push(t.id); });
+  return JSON.stringify({ version:SCHEMA_VERSION, exportedAt:new Date().toISOString(), timeZone:tzName(), tasks:store.tasks, sections:store.sections, archive:store.archive||[], todo:buildTodoFeed(), deletedIds:delIds }, null, 2);
+}
+var TODO_SCHEMA = JSON.stringify({
+  type:"object",
+  properties:{
+    todo:{ type:"array", items:{ type:"object", properties:{
+      id:{type:"string"}, title:{type:"string"}, list:{type:"string"},
+      importance:{type:"string"}, status:{type:"string"}, isReminderOn:{type:"boolean"},
+      dueDateTime:{}, reminderDateTime:{}, timeZone:{type:"string"},
+      bodyContent:{type:"string"}, dueDate:{}, dueTime:{}
+    }, required:["id","title","status"] } }
+  }
+}, null, 2);
+function doImport(text, silent){
+  var parsed; try { parsed = JSON.parse(text); } catch(e){ if(!silent) alert("That is not valid JSON."); return false; }
+  if(!parsed || (!Array.isArray(parsed.tasks) && !Array.isArray(parsed.sections))){ if(!silent) alert("JSON must contain a 'tasks' and/or 'sections' array."); return false; }
+  var secs = (Array.isArray(parsed.sections)?parsed.sections:[]).filter(function(s){return s&&typeof s.name==="string";}).map(function(s){ return { id:typeof s.id==="string"?s.id:uid("sec"), name:s.name, list:s.list==="work"?"work":"personal" }; });
+  var sids = {}; secs.forEach(function(s){ sids[s.id]=1; });
+  var skipped=0; var tasks=[];
+  (Array.isArray(parsed.tasks)?parsed.tasks:[]).forEach(function(t){ if(!t||typeof t.title!=="string"||!t.title.trim()){ skipped++; return; } var nt = Object.assign({}, t); nt.id=typeof t.id==="string"?t.id:uid("t"); nt.list=t.list==="work"?"work":"personal"; nt.sectionId=(typeof t.sectionId==="string"&&sids[t.sectionId])?t.sectionId:null; nt.priority=(t.priority==="high"||t.priority==="low"||t.priority==="medium")?t.priority:"medium"; nt.dueDate=typeof t.dueDate==="string"?t.dueDate:null; nt.dueTime=typeof t.dueTime==="string"?t.dueTime:null; nt.notes=typeof t.notes==="string"?t.notes:""; nt.completed=!!t.completed; nt.completedAt=(typeof t.completedAt==="number")?t.completedAt:null; nt.recur=(["daily","weekly","weekdays","monthly","yearly"].indexOf(t.recur)>=0)?t.recur:"none"; nt.deletedAt=typeof t.deletedAt==="number"?t.deletedAt:null; nt.createdAt=typeof t.createdAt==="number"?t.createdAt:Date.now(); tasks.push(nt); });
+  // archive rides along if the backup has one; otherwise keep what's already here (older files predate archiving)
+  var arch = Array.isArray(parsed.archive) ? parsed.archive.filter(function(t){return t && typeof t.title==="string";}) : ((store&&store.archive)||[]);
+  if(!silent) pushHistory();
+  store = { tasks:tasks, sections:secs, archive:arch }; save();
+  if(!silent) toast("Imported "+tasks.length+" task"+(tasks.length===1?"":"s")+(skipped?" - "+skipped+" skipped":""), {label:"Undo", fn:doUndo});
+  return true;
+}
+
+// ---------------- state ----------------
+var store = (typeof window!=="undefined") ? load() : clone(SEED);
+var view = "combined";
+var addList = "work";
+var dragId = null;   // task id currently being dragged
+var draftPrio = "medium", draftDate = "", draftTime = "", draftRemind = false, draftNotes = "";   // add-box draft (survives re-render)
+var filter = "all";
+var preCompletedSort = null;   // remembers sort/group to restore when leaving the Completed filter
+var prioFilter = "all";
+var search = "";
+var sortMode = "due";
+var sortDir = "asc";      // asc | desc
+var compact = false;      // tighter rows (toolbar toggle, persisted)
+var groupBy = "date";     // date | priority | list | none
+var expanded = {};   // task id -> bool
+var menuOpen = null; // task id for calendar menu
+var popover = null;  // {id, kind:'due'|'prio'|'note'} inline meta editor
+var modal = null;    // 'export' | 'import' | null
+var importBuf = "";
+var toastMsg = null, toastAction=null, toastTimer=null;
+var selectMode=false, selected={}, selAnchor=null;
+var undoStack = [], redoStack = [], MAX_HIST = 80;   // multi-level undo / redo (snapshots of store)
+var lastFocused = null;     // element to restore focus to after closing modal
+var THEME_KEY = "taskhub-theme";
+var darkMode = (function(){ try{ var s=localStorage.getItem(THEME_KEY); if(s==="dark")return true; if(s==="light")return false; }catch(e){} return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches); })();
+function applyTheme(){ try{ document.documentElement.setAttribute("data-theme", darkMode?"dark":"light"); }catch(e){} }
+function toggleTheme(){ darkMode=!darkMode; try{ localStorage.setItem(THEME_KEY, darkMode?"dark":"light"); }catch(e){} applyTheme(); render(); }
+
+// remember view / filters / sort across sessions
+var PREFS_KEY = "taskhub-prefs-v1";
+function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact })); }catch(e){} }
+function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}");
+  if(["today","combined","work","personal"].indexOf(p.view)>=0) view=p.view;
+  if(["all","active","completed"].indexOf(p.filter)>=0) filter=p.filter;
+  if(["all","high","medium","low"].indexOf(p.prioFilter)>=0) prioFilter=p.prioFilter;
+  if(["due","priority","alpha","created","done","manual"].indexOf(p.sortMode)>=0) sortMode=p.sortMode;
+  if(p.sortDir==="asc"||p.sortDir==="desc") sortDir=p.sortDir;
+  if(["date","priority","list","none"].indexOf(p.groupBy)>=0) groupBy=p.groupBy;
+  if(typeof p.compact==="boolean") compact=p.compact;
+}catch(e){} }
+
+function toast(m, action){ toastMsg=m; toastAction=action||null; if(toastTimer)clearTimeout(toastTimer); render(); var dur=action?7000:3500; toastTimer=setTimeout(function(){toastMsg=null;toastAction=null;render();},dur); }
+function pushHistory(){ undoStack.push(clone(store)); if(undoStack.length>MAX_HIST) undoStack.shift(); redoStack=[]; }
+function doUndo(){ if(!undoStack.length){ toast("Nothing to undo"); return; } redoStack.push(clone(store)); if(redoStack.length>MAX_HIST) redoStack.shift(); store=undoStack.pop(); selected={}; save(); render(); }
+function doRedo(){ if(!redoStack.length){ toast("Nothing to redo"); return; } undoStack.push(clone(store)); store=redoStack.pop(); selected={}; save(); render(); }
+function purgeOldTrash(){ var cutoff=Date.now()-30*86400000; var n=store.tasks.length; store.tasks=store.tasks.filter(function(t){ return !(t.deletedAt && t.deletedAt<cutoff); }); if(store.tasks.length!==n) save(); }
+// completed tasks older than 90 days move to store.archive: kept in the data file, hidden from
+// the UI and the To Do feed. Only tasks with a known completion time are archived (safe default).
+var ARCHIVE_AFTER_DAYS = 90;
+function archiveOldDone(){
+  if(!Array.isArray(store.archive)) store.archive=[];
+  var cutoff=Date.now()-ARCHIVE_AFTER_DAYS*86400000, now=Date.now(), keep=[], moved=0;
+  store.tasks.forEach(function(t){
+    if(t.completed && !t.deletedAt && typeof t.completedAt==="number" && t.completedAt<cutoff){ store.archive.push(Object.assign({},t,{archivedAt:now})); moved++; }
+    else keep.push(t);
+  });
+  if(moved){ store.tasks=keep; save(); }
+}
+
+// ---------------- mutations (every user action snapshots for undo) ----------------
+function addTask(title, list, sectionId, priority, dueDate, dueTime, notes){ title=(title||"").trim(); if(!title)return; pushHistory(); store.tasks.push({ id:uid("t"), title:title, list:list, sectionId:sectionId||null, priority:priority||"medium", dueDate:dueDate||null, dueTime:(dueDate?(dueTime||null):null), notes:(notes||"").trim(), completed:false, completedAt:null, recur:"none", deletedAt:null, createdAt:Date.now() }); save(); render(); toast('Added "'+title+'"', {label:"Undo", fn:doUndo}); }
+// human-friendly summary of a single-task edit, used for the undo toast
+function describePatch(patch, t){
+  var title = t ? '"'+t.title+'"' : "task";
+  if("completed" in patch) return patch.completed ? "Completed "+title : "Marked "+title+" active";
+  if("priority" in patch) return "Priority → "+((PRIO[patch.priority]&&PRIO[patch.priority].label)||patch.priority);
+  if("list" in patch) return "Moved "+title+" to "+((THEME[patch.list]&&THEME[patch.list].label)||patch.list);
+  if("title" in patch) return "Renamed task";
+  if("dueDate" in patch) return patch.dueDate ? "Due date updated" : "Due date cleared";
+  if("dueTime" in patch) return patch.dueTime ? "Reminder set" : "Reminder cleared";
+  if("recur" in patch) return (patch.recur && patch.recur!=="none") ? "Repeat set" : "Repeat removed";
+  if("notes" in patch) return "Note updated";
+  return "Task updated";
+}
+// every single-task edit now shows a bottom undo toast; pass `msg` to override the auto summary, or `false` to stay silent
+function updateTask(id,patch,msg){ var prev=store.tasks.filter(function(t){return t.id===id;})[0]; pushHistory(); store.tasks=store.tasks.map(function(t){ return t.id===id?Object.assign({},t,patch):t; }); save(); render(); if(msg!==false) toast(msg||describePatch(patch,prev), {label:"Undo", fn:doUndo}); }
+// quick-note commit WITHOUT a full re-render: keeps the row's DOM intact so a click that stole
+// focus (e.g. the expand chevron) still lands on the first try. Notes don't affect layout/sort.
+function saveNoteQuiet(id,val){
+  var t=store.tasks.filter(function(x){return x.id===id;})[0];
+  if(!t || (t.notes||"")===(val||"")) return;
+  pushHistory();
+  store.tasks=store.tasks.map(function(x){ return x.id===id?Object.assign({},x,{notes:val}):x; });
+  save();
+  var ub=document.getElementById("ubtn"), rb=document.getElementById("rbtn");   // sync undo/redo affordance
+  if(ub) ub.disabled=false; if(rb) rb.disabled=true;
+}
+function toggleComplete(id){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t)return; if(!t.completed && t.recur && t.recur!=="none" && t.dueDate){ pushHistory(); var nd=nextRecur(t.dueDate, t.recur); store.tasks=store.tasks.map(function(x){ return x.id===id?Object.assign({},x,{dueDate:nd}):x; }); save(); render(); toast("Repeats "+(RECUR_LABEL[t.recur]||"").toLowerCase()+" — next due "+fmtDue(nd,t.dueTime), {label:"Undo", fn:doUndo}); } else { var nowDone=!t.completed; updateTask(id,{completed:nowDone, completedAt: nowDone?Date.now():null}); } }
+function delTask(id){ pushHistory(); store.tasks=store.tasks.map(function(t){ return t.id===id?Object.assign({},t,{deletedAt:Date.now(),completed:false}):t; }); save(); render(); toast("Moved to Recently deleted", {label:"Undo", fn:doUndo}); }
+function moveToBucket(id, key){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t || bucketOf(t)===key) return; var d=bucketDate(key); var patch={dueDate:d}; if(d===null)patch.dueTime=null; var name=(BUCKETS.filter(function(b){return b.k===key;})[0]||{}).name||key; updateTask(id, patch, "Moved to "+name); }
+function reorderTask(dragId, targetId){   // manual ("My order") drag: place dragged just before target
+  if(!dragId || dragId===targetId) return;
+  var live=store.tasks.filter(function(t){return !t.deletedAt;}).slice().sort(function(a,b){ return manualKey(a)-manualKey(b); });
+  var di=-1; for(var i=0;i<live.length;i++){ if(live[i].id===dragId){ di=i; break; } }
+  if(di<0) return;
+  pushHistory();
+  var moved=live.splice(di,1)[0];
+  var ti=-1; for(var j=0;j<live.length;j++){ if(live[j].id===targetId){ ti=j; break; } }
+  if(ti<0){ live.push(moved); } else { live.splice(ti,0,moved); }
+  var omap={}; live.forEach(function(t,k){ omap[t.id]=k; });
+  store.tasks=store.tasks.map(function(t){ return (omap[t.id]!=null)?Object.assign({},t,{order:omap[t.id]}):t; });
+  save(); render(); toast("Reordered", {label:"Undo", fn:doUndo});
+}
+function clearDone(){ var v=view; var hit=function(t){ var inScope=(v==="combined"||v==="today")?true:t.list===v; return inScope&&t.completed&&!t.deletedAt; }; if(!store.tasks.some(hit))return; pushHistory(); var now=Date.now(); store.tasks=store.tasks.map(function(t){ return hit(t)?Object.assign({},t,{deletedAt:now}):t; }); save(); render(); toast("Cleared completed", {label:"Undo", fn:doUndo}); }
+function selectedIds(){ return Object.keys(selected).filter(function(k){return selected[k];}); }
+function currentVisibleIds(){ if(view==="today"){ var tk=todayStr(); return store.tasks.filter(function(t){ return !t.deletedAt && ((t.dueDate&&t.dueDate<tk&&!t.completed)||t.dueDate===tk||(!t.completed&&!t.dueDate)); }).map(function(t){return t.id;}); } return visibleTasks().map(function(t){return t.id;}); }
+// ids in the exact on-screen order (grouped + sorted) — for Ctrl+A and Shift-range selection
+function visibleOrderedIds(){
+  var vis=visibleTasks();
+  if(sortMode==="manual") return sortTasks(vis).map(function(t){return t.id;});
+  var spec=groupSpec(), ids=[];
+  spec.groups.forEach(function(g){ sortTasks(vis.filter(function(t){return spec.of(t)===g.k;})).forEach(function(t){ ids.push(t.id); }); });
+  return ids;
+}
+function patchSelected(patch, msg){ var ids=selectedIds(); if(!ids.length)return; pushHistory(); var s={}; ids.forEach(function(i){s[i]=1;}); store.tasks=store.tasks.map(function(t){ return s[t.id]?Object.assign({},t,patch):t; }); save(); render(); toast(msg+" for "+ids.length+" task"+(ids.length===1?"":"s"), {label:"Undo", fn:doUndo}); }
+function deleteSelected(){ var ids=selectedIds(); if(!ids.length)return; pushHistory(); var s={}; ids.forEach(function(i){s[i]=1;}); var now=Date.now(); store.tasks=store.tasks.map(function(t){ return s[t.id]?Object.assign({},t,{deletedAt:now,completed:false}):t; }); selected={}; save(); render(); toast("Moved "+ids.length+" to Recently deleted", {label:"Undo", fn:doUndo}); }
+function setDueSelected(date){ patchSelected({dueDate:date}, (date?"Due date set":"Due date removed")); }
+function setPrioSelected(p){ patchSelected({priority:p}, "Priority set"); }
+function setListSelected(l){ patchSelected({list:l}, "Moved to "+((THEME[l]&&THEME[l].label)||l)); }
+// ---- Recently deleted (trash) ----
+function trashedTasks(){ return store.tasks.filter(function(t){return t.deletedAt;}); }
+function restoreTask(id){ pushHistory(); store.tasks=store.tasks.map(function(t){ return t.id===id?Object.assign({},t,{deletedAt:null}):t; }); save(); render(); toast("Restored", {label:"Undo", fn:doUndo}); }
+function purgeTask(id){ pushHistory(); store.tasks=store.tasks.filter(function(t){return t.id!==id;}); save(); render(); }
+function restoreAllTrash(){ if(!trashedTasks().length)return; pushHistory(); store.tasks=store.tasks.map(function(t){ return t.deletedAt?Object.assign({},t,{deletedAt:null}):t; }); save(); render(); toast("All restored"); }
+function emptyTrash(){ if(!trashedTasks().length)return; pushHistory(); store.tasks=store.tasks.filter(function(t){return !t.deletedAt;}); save(); render(); toast("Recently deleted emptied"); }
+function renderBulkBar(){
+  var ids=selectedIds();
+  var bar=el('<div class="card bulkbar"></div>');
+  bar.appendChild(el('<b style="font-size:15px">'+ids.length+' selected</b>'));
+  var allBtn=el('<button class="btn">Select all visible</button>'); allBtn.onclick=function(){ currentVisibleIds().forEach(function(i){ selected[i]=true; }); render(); }; bar.appendChild(allBtn);
+  var clr=el('<button class="btn">Clear</button>'); clr.onclick=function(){ selected={}; selAnchor=null; render(); }; bar.appendChild(clr);
+  var due=el('<select class="field"><option value="">Set due date...</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="weekend">This weekend (Sat)</option><option value="nextweek">Next week (Mon)</option><option value="none">Remove due date</option></select>');
+  due.disabled = ids.length===0;
+  due.onchange=function(){ var v=due.value; if(!v)return; var d=null; if(v==="today")d=todayStr(); else if(v==="tomorrow")d=addDays(todayStr(),1); else if(v==="weekend")d=dowDate(6,true); else if(v==="nextweek")d=dowDate(1,false); else d=null; setDueSelected(d); due.value=""; };
+  bar.appendChild(due);
+  var prio=el('<select class="field" aria-label="Set priority"><option value="">Set priority...</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>'); prio.disabled=ids.length===0; prio.onchange=function(){ if(prio.value){ setPrioSelected(prio.value); prio.value=""; } }; bar.appendChild(prio);
+  var lst=el('<select class="field" aria-label="Move to list"><option value="">Move to list...</option><option value="personal">Personal</option><option value="work">Work</option></select>'); lst.disabled=ids.length===0; lst.onchange=function(){ if(lst.value){ setListSelected(lst.value); lst.value=""; } }; bar.appendChild(lst);
+  var del=el('<button class="btn btn-danger">'+ic('trash')+' Delete</button>'); del.disabled=ids.length===0; del.onclick=function(){ if(ids.length) deleteSelected(); }; bar.appendChild(del);
+  return bar;
+}
+
+// ---------------- rendering ----------------
+var PRIO_ORDER={high:0,medium:1,low:2};
+function urgentCount(scope){ var tk=todayStr(); return store.tasks.filter(function(t){ if(t.deletedAt||t.completed||!t.dueDate)return false; if(t.dueDate>tk)return false; if(scope==="personal")return t.list==="personal"; if(scope==="work")return t.list==="work"; return true; }).length; }
+
+function el(html){ var d=document.createElement("div"); d.innerHTML=html; return d.firstElementChild; }
+
+function render(){
+  storageOk = checkStorage();
+  savePrefs();
+  var app=document.getElementById("app");
+  app.innerHTML="";
+  app.classList.toggle("compact", compact);
+  var nUrg=urgentCount("combined");                 // overdue + due today, all lists
+  document.title=(nUrg?("("+nUrg+") "):"")+"TaskHub";
+  var isToday=view==="today", isComb=view==="combined";
+  var th=THEME[view];
+  var active=store.tasks.filter(function(t){return !t.deletedAt&&!t.completed;}).length;
+  var done=store.tasks.filter(function(t){return !t.deletedAt&&t.completed;}).length;
+  if(!(isComb||isToday)){ active=store.tasks.filter(function(t){return !t.deletedAt&&t.list===view&&!t.completed;}).length; done=store.tasks.filter(function(t){return !t.deletedAt&&t.list===view&&t.completed;}).length; }
+
+  // header
+  var hdr=el('<div class="hdr"></div>');
+  var hi=el('<div class="hdr-inner" style="background:'+th.grad+'"></div>');
+  hi.appendChild(el('<div><h1>TaskHub</h1><p>'+active+' active &middot; '+done+' done</p></div>'));
+  var tabs=el('<div class="tabs" role="tablist" aria-label="Task views"></div>');
+  var tabOrder=["today","combined","work","personal"];
+  tabOrder.forEach(function(v){ var t=THEME[v]; var b=el('<button class="tab'+(view===v?" active":"")+'" role="tab" aria-selected="'+(view===v)+'" tabindex="'+(view===v?"0":"-1")+'"></button>'); b.style.color = view===v ? t.accent : "rgba(255,255,255,.9)"; var u=urgentCount(v); b.innerHTML = t.label + (u>0?' <span class="badge" aria-label="'+u+' urgent">'+u+'</span>':''); b.setAttribute("aria-label", t.label+(u>0?" ("+u+" urgent)":"")); b.onclick=function(){ view=v; render(); }; tabs.appendChild(b); });
+  tabs.onkeydown=function(e){ var i=tabOrder.indexOf(view); var ni=-1; if(e.key==="ArrowRight"||e.key==="ArrowDown")ni=(i+1)%tabOrder.length; else if(e.key==="ArrowLeft"||e.key==="ArrowUp")ni=(i+tabOrder.length-1)%tabOrder.length; else if(e.key==="Home")ni=0; else if(e.key==="End")ni=tabOrder.length-1; if(ni>=0){ e.preventDefault(); view=tabOrder[ni]; render(); var nb=document.querySelector('.tab[aria-selected="true"]'); if(nb)nb.focus(); } };
+  hi.appendChild(tabs); hdr.appendChild(hi); app.appendChild(hdr);
+
+  // toolbar
+  var tb=el('<div class="toolbar"></div>');
+  // primary actions (always visible)
+  var ub=el('<button id="ubtn" class="btn" aria-label="Undo" title="Undo (Ctrl+Z)"'+(undoStack.length?"":" disabled")+'>'+ic('undo')+'<span class="hide-sm"> Undo</span></button>'); ub.onclick=doUndo; tb.appendChild(ub);
+  var rb=el('<button id="rbtn" class="btn" aria-label="Redo" title="Redo (Ctrl+Y)"'+(redoStack.length?"":" disabled")+'>'+ic('redo')+'<span class="hide-sm"> Redo</span></button>'); rb.onclick=doRedo; tb.appendChild(rb);
+  // smart link/reconnect button (kept visible when it needs attention)
+  var anyRC=rcNeeded();
+  var la=null;
+  if(fsSupported){
+    var allLinked=fileHandle&&eventsHandle&&inboxHandle&&!anyRC;
+    if(anyRC){ la=el('<button class="btn" style="background:#fffbeb;border-color:#fde68a;color:#b45309" title="Reconnect data, events & AI inbox in one click">'+ic('alert')+' Reconnect all</button>'); la.onclick=reconnectAll; }
+    else if(allLinked){ la=el('<button class="btn" title="Data, events & AI inbox are linked - click to relink or add files">'+ic('check')+' All linked</button>'); la.onclick=linkAll; }
+    else { la=el('<button class="btn" title="Link data, events & AI inbox at once - select your taskhub JSON files">'+ic('link')+' Link all</button>'); la.onclick=linkAll; }
+  }
+  if(la && anyRC) tb.appendChild(la);
+  // overflow group: inline on desktop, "More" dropdown on phones
+  var more=el('<div class="tb-more"></div>');
+  var onTog=darkMode?' style="background:#1c2a3a;border-color:#2f5e8f;color:#7cc0ff"':' style="background:#dbeafe;border-color:#bfdbfe;color:#1d4ed8"';   // active-toggle tint (dark-aware)
+  var selBtn=el('<button class="btn"'+(selectMode?onTog:'')+'>'+ic('checksq')+' '+(selectMode?"Selecting":"Select")+'</button>'); selBtn.onclick=function(){ selectMode=!selectMode; if(!selectMode){selected={}; selAnchor=null;} render(); }; more.appendChild(selBtn);
+  var cmpBtn=el('<button class="btn" aria-pressed="'+compact+'"'+(compact?onTog:'')+' title="'+(compact?"Back to comfortable spacing":"Tighter rows — fit more tasks on screen")+'">'+ic('rows')+' Compact</button>'); cmpBtn.onclick=function(){ compact=!compact; render(); }; more.appendChild(cmpBtn);
+  var trashN=trashedTasks().length;
+  if(trashN>0){ var trb=el('<button class="btn" title="Recently deleted">'+ic('trash')+' Trash <span class="pill">'+trashN+'</span></button>'); trb.onclick=function(){ openModal("trash"); }; more.appendChild(trb); }
+  if(la && !anyRC) more.appendChild(la);
+  var ex=el('<button class="btn">'+ic('download')+' Export</button>'); ex.onclick=function(){ openModal("export"); }; more.appendChild(ex);
+  var im=el('<button class="btn">'+ic('upload')+' Import</button>'); im.onclick=function(){ openModal("import"); }; more.appendChild(im);
+  var pa=el('<button class="btn">'+ic('bolt')+' To Do sync</button>'); pa.onclick=function(){ openModal("automate"); }; more.appendChild(pa);
+  tb.appendChild(more);
+  var moreBtn=el('<button class="btn tb-more-btn" aria-haspopup="true" aria-expanded="false" aria-label="More actions">'+ic('chevdown')+' More</button>'); moreBtn.onclick=function(e){ e.stopPropagation(); var pnl=tb.querySelector('.tb-more'); if(pnl){ var op=pnl.classList.toggle('open'); moreBtn.setAttribute('aria-expanded', String(op)); } }; tb.appendChild(moreBtn);
+  // primary trailing
+  var aiN=inboxPending.length;
+  var ai=el('<button class="btn"'+(aiN?' style="background:'+lS("today")+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'; color:'+lA("today")+'"':'')+' title="AI assistant (Dust)">'+ic('sparkles')+'<span class="hide-sm"> AI</span>'+(aiN?' <span class="pill" style="background:'+lA("today")+'; color:#fff">'+aiN+'</span>':'')+'</button>'); ai.onclick=function(){ if(inboxPending.length) openModal("aiReview"); else openModal("ai"); }; tb.appendChild(ai);
+  var dk=el('<button class="btn" aria-label="'+(darkMode?"Switch to light mode":"Switch to dark mode")+'" title="Toggle dark mode">'+(darkMode?ic('sun'):ic('moon'))+'<span class="hide-sm">'+(darkMode?"Light":"Dark")+'</span></button>'); dk.onclick=toggleTheme; tb.appendChild(dk);
+  app.appendChild(tb);
+  if(selectMode){ app.appendChild(renderBulkBar()); }
+
+  // storage warning
+  if(rcNeeded()){
+    var paused=[]; if(fileHandle&&dataNeedsPermission)paused.push("auto-save"); if(eventsHandle&&eventsNeedsReconnect)paused.push("Outlook events"); if(inboxHandle&&inboxNeedsReconnect)paused.push("AI inbox");
+    var pausedTxt = (paused.length===1) ? paused[0] : (paused.slice(0,-1).join(", ")+" and "+paused[paused.length-1]);
+    pausedTxt = pausedTxt.charAt(0).toUpperCase()+pausedTxt.slice(1);
+    var single = (paused.length===1);
+    var rcTitle = single ? (pausedTxt+" paused") : "Connections paused";
+    var rcMsg = single ? "Click Reconnect all (one tap) to resume." : (esc(pausedTxt)+" are paused. Click Reconnect all (one tap) to resume.");
+    var rcw=el('<div class="warn"><span>'+ic('alert')+' <b>'+esc(rcTitle)+'.</b> '+rcMsg+'</span></div>');
+    var rcb=el('<button class="btn" style="margin-left:auto">Reconnect all</button>'); rcb.onclick=reconnectAll; rcw.appendChild(rcb); rcw.style.alignItems="center";
+    app.appendChild(rcw);
+  } else if(!storageOk && !fileHandle){
+    app.appendChild(el('<div class="warn">'+ic('alert')+' <span><b>This browser is blocking local storage.</b> Changes won\'t persist on refresh. If your browser supports it, click <b>Link all</b> above to auto-save to a JSON file in OneDrive, or use <b>Export</b> to back up.</span></div>'));
+  }
+  // (the "Auto-saving" confirmation now lives compactly in the toolbar's "All linked" button)
+
+  // AI suggestions awaiting review (risky ops the Dust agent proposed)
+  if(inboxPending.length){
+    var aiw=el('<div class="warn" style="background:'+lS("today")+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'; color:'+lA("today")+'; align-items:center"><span>'+ic('sparkles')+' <b>'+inboxPending.length+' AI suggestion'+(inboxPending.length===1?"":"s")+'</b> to review (edits / reschedules / deletes).</span></div>');
+    var aibtn=el('<button class="btn" style="margin-left:auto">Review</button>'); aibtn.onclick=function(){ openModal("aiReview"); }; aiw.appendChild(aibtn);
+    app.appendChild(aiw);
+  }
+
+  // two-column region: main content + sticky Today rail (rail shows only on wide screens via CSS)
+  var layout=el('<div class="layout"></div>');
+  var main=el('<div class="main" style="min-width:0"></div>');
+  // Upcoming Events: in the right rail on wide screens; inline fallback (.rail-fallback) on narrow
+  if(!isToday){ var evFb=el('<div class="rail-fallback"></div>'); evFb.appendChild(renderEvents()); main.appendChild(evFb); }
+
+  if(isToday){ main.appendChild(renderToday()); }
+  else {
+    main.appendChild(renderAddBox(th));
+    if(groupBy==="date" && sortMode!=="manual") main.appendChild(renderBucketNav());
+    main.appendChild(renderSearchFilter());
+    main.appendChild(renderGroups());
+  }
+  layout.appendChild(main);
+  var rail=el('<div class="rail" style="margin-top:16px"></div>');
+  rail.appendChild(renderTodayCalendar());
+  if(!isToday) rail.appendChild(renderEvents());
+  layout.appendChild(rail);
+  app.appendChild(layout);
+
+  if(modal){
+    app.appendChild(renderModal());
+    setTimeout(function(){ var mod=document.querySelector(".modal"); if(mod && !mod.contains(document.activeElement)){ var f=mod.querySelector('button,[href],input,textarea,select'); if(f)f.focus(); } },0);
+  }
+  if(toastMsg){
+    var tt=el('<div class="toast" role="status" aria-live="polite"><div class="inner"></div></div>');
+    var inner=tt.firstElementChild;
+    inner.appendChild(document.createTextNode(toastMsg));
+    if(toastAction){
+      var ab=el('<button class="btn" style="background:transparent;border-color:#475569;color:#fff;padding:5px 10px">'+ic('undo')+' '+esc(toastAction.label)+'</button>');
+      ab.onclick=function(){ var fn=toastAction.fn; toastMsg=null; toastAction=null; if(toastTimer)clearTimeout(toastTimer); if(fn)fn(); };
+      inner.appendChild(ab);
+    }
+    app.appendChild(tt);
+  }
+}
+
+function renderAddBox(th){
+  var box=el('<div class="card addbox"></div>');
+  // clicking anywhere in the card (not on a control) focuses the title field — bigger, forgiving hit area
+  box.onmousedown=function(e){ if(e.target.closest('input,textarea,select,button,a')) return; e.preventDefault(); var a=document.getElementById('addInput'); if(a)a.focus(); };
+  var r=el('<div class="row"></div>');
+  var inp=el('<input id="addInput" class="titleInput" aria-label="New task title" placeholder="Add a task to '+THEME[(view==="combined")?addList:view].label+'..." style="flex:1; padding:11px 14px; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; border-radius:10px; background:'+(darkMode?"#1c1b19":"#f8fafc")+'; font-size:16px" />');
+  inp.onkeydown=function(e){ if(e.key==="Enter"){ doAdd(); } };
+  var btn=el('<button class="btn btn-primary" style="background:'+th.grad+'; padding:8px 16px">Add</button>'); btn.onclick=doAdd;
+  r.appendChild(inp); r.appendChild(btn); box.appendChild(r);
+
+  var ctrls=el('<div class="row" style="flex-wrap:wrap; gap:8px; margin-top:10px"></div>');
+  var listSel=null;
+  if(view==="combined"){ listSel=el('<select class="field" aria-label="List"><option value="personal">Personal</option><option value="work">Work</option></select>'); listSel.value=addList; listSel.onchange=function(){ addList=listSel.value; render(); }; ctrls.appendChild(listSel); }
+  var targetList=(view==="combined")?addList:view;
+  var prioSel=el('<select class="field" aria-label="Priority"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>'); prioSel.value=draftPrio; prioSel.onchange=function(){ draftPrio=prioSel.value; }; ctrls.appendChild(prioSel);
+  var dateInp=el('<input type="date" class="field" aria-label="Due date" />'); dateInp.value=draftDate; ctrls.appendChild(dateInp);
+  var qToday=el('<button class="chip" type="button" aria-pressed="false">Today</button>');
+  var qTom=el('<button class="chip" type="button" aria-pressed="false">Tomorrow</button>');
+  // reminder toggle + time (time only shows when "Remind me" is on, and only with a date)
+  var remChip=el('<button class="chip" type="button" aria-pressed="'+draftRemind+'">'+ic('bell')+' Remind me</button>');
+  var timeSel=timeSelect(draftTime||"09:00", false, function(v){ draftTime=v||""; });
+  function syncDate(){
+    draftDate=dateInp.value;
+    var hasD=!!draftDate;
+    if(!hasD){ draftRemind=false; }
+    remChip.disabled=!hasD;
+    remChip.setAttribute("aria-pressed", String(draftRemind));
+    remChip.style.color = draftRemind?THEME.today.accent:"";
+    timeSel.style.display = (draftRemind&&hasD)?"":"none";
+    qToday.setAttribute("aria-pressed", String(dateInp.value===todayStr())); qTom.setAttribute("aria-pressed", String(dateInp.value===addDays(todayStr(),1)));
+    qToday.style.color=dateInp.value===todayStr()?THEME.today.accent:""; qTom.style.color=dateInp.value===addDays(todayStr(),1)?THEME.today.accent:"";
+  }
+  remChip.onclick=function(){ if(!draftDate)return; draftRemind=!draftRemind; if(draftRemind && !draftTime){ draftTime="09:00"; timeSel.value="09:00"; } syncDate(); };
+  qToday.onclick=function(){ dateInp.value=(dateInp.value===todayStr())?"":todayStr(); syncDate(); };
+  qTom.onclick=function(){ var tm=addDays(todayStr(),1); dateInp.value=(dateInp.value===tm)?"":tm; syncDate(); };
+  dateInp.onchange=syncDate;
+  ctrls.appendChild(qToday); ctrls.appendChild(qTom); ctrls.appendChild(remChip); ctrls.appendChild(timeSel);
+  var extra=el('<div class="add-extra"></div>');   // priority/date/notes — revealed when you click into the add box
+  extra.appendChild(ctrls);
+  syncDate();
+
+  var noteInp=el('<textarea class="field" rows="2" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; margin-top:10px; resize:vertical"></textarea>'); noteInp.value=draftNotes; noteInp.oninput=function(){ draftNotes=noteInp.value; }; extra.appendChild(noteInp);
+  var nLinkRow=el('<div class="row" style="margin-top:6px"></div>'); var nLinkA=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLinkA.onclick=function(){ insertLinkAtCursor(noteInp, function(v){ draftNotes=v; }); }; nLinkRow.appendChild(nLinkA); extra.appendChild(nLinkRow);
+  box.appendChild(extra);
+
+  function doAdd(){ var title=(inp.value||"").trim(); if(!title){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; } var dd=draftDate||null, tt2=(draftRemind&&draftDate)?(draftTime||"09:00"):null, pr=draftPrio, nt=draftNotes; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; addTask(title, targetList, null, pr, dd, tt2, nt); var a2=document.getElementById("addInput"); if(a2)a2.focus(); }
+  return box;
+}
+
+function renderBucketNav(){
+  var nav=el('<div class="row" style="flex-wrap:wrap; gap:6px; margin-top:16px" aria-label="Jump to bucket"></div>');
+  var scope=(view==="combined")?store.tasks.filter(function(t){return !t.deletedAt;}):store.tasks.filter(function(t){return t.list===view&&!t.deletedAt;});
+  var act=scope.filter(function(t){return !t.completed;});
+  BUCKETS.forEach(function(g){ var c=act.filter(function(t){return bucketOf(t)===g.k;}).length; if(c===0 && (g.k==="nodue"||g.k==="earlier")) return; var isE=(g.k==="earlier"&&c>0); var isT=(g.k==="today"&&c>0);
+    var col=isE?(darkMode?"#fb7185":"#be123c"):isT?lA("today"):(darkMode?"#d6d3d1":"#475569");
+    var eStyle=isE?(darkMode?";border-color:#7f1d2e;background:#3a1d24":";border-color:#fecdd3;background:#fff1f2"):isT?(";border-color:"+lA("today")+";background:"+lS("today")):"";
+    var ePill=isE?(darkMode?' style="background:#7f1d2e;color:#fda4af"':' style="background:#fecdd3;color:#be123c"'):isT?(' style="background:'+lS("today")+';color:'+lA("today")+'"'):'';
+    var b=el('<button class="chip" style="color:'+col+eStyle+'">'+esc(g.name)+' <span class="pill"'+ePill+'>'+c+'</span></button>'); b.onclick=function(){ var node=document.getElementById("group-"+g.k); if(node) node.scrollIntoView({behavior:"smooth",block:"start"}); }; nav.appendChild(b); });
+  return nav;
+}
+
+// switching to Completed defaults to no-grouping + completion-date (latest first); restores your view on the way out
+function setFilter(nf){
+  if(nf===filter){ render(); return; }
+  if(nf==="completed" && filter!=="completed"){
+    preCompletedSort={ sortMode:sortMode, sortDir:sortDir, groupBy:groupBy };
+    sortMode="done"; sortDir="asc"; groupBy="none";
+  } else if(nf!=="completed" && filter==="completed" && preCompletedSort){
+    sortMode=preCompletedSort.sortMode; sortDir=preCompletedSort.sortDir; groupBy=preCompletedSort.groupBy;
+    preCompletedSort=null;
+  }
+  filter=nf; render();
+}
+function renderSearchFilter(){
+  var wrap=el('<div></div>');
+  var sb=el('<div class="card row" style="margin-top:12px; padding:8px 12px"></div>');
+  sb.appendChild(el('<span class="muted" aria-hidden="true" style="display:flex">'+ic('search')+'</span>'));
+  var si=el('<input id="searchInput" type="search" class="titleInput" aria-label="Search tasks" placeholder="Search tasks... (press /)" />'); si.value=search; si.oninput=function(){ search=si.value; var node=renderGroups(); var old=document.getElementById("groups"); if(old&&node){ old.replaceWith(node);} }; sb.appendChild(si); wrap.appendChild(sb);
+
+  var fr=el('<div class="row" style="justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:12px"></div>');
+  var seg=el('<div class="seg"></div>');
+  seg.setAttribute("role","group"); seg.setAttribute("aria-label","Filter by status");
+  [["all","All"],["active","Active"],["completed","Completed"]].forEach(function(m){ var b=el('<button class="'+(filter===m[0]?"active":"")+'" aria-pressed="'+(filter===m[0])+'">'+m[1]+'</button>'); b.onclick=function(){ setFilter(m[0]); }; seg.appendChild(b); });
+  fr.appendChild(seg);
+  var right=el('<div class="row" style="gap:8px; flex-wrap:wrap"></div>');
+  var sort=el('<select class="field" aria-label="Sort tasks"><option value="due">Due date</option><option value="priority">Priority</option><option value="alpha">Alphabetical</option><option value="created">Newest</option><option value="done">Completion date</option><option value="manual">My order</option></select>'); sort.value=sortMode; sort.onchange=function(){ sortMode=sort.value; render(); }; right.appendChild(sort);
+  if(sortMode!=="manual"){
+    var dir=el('<button class="btn" aria-label="Sort direction: '+(sortDir==="asc"?"ascending":"descending")+'" title="Reverse order">'+(sortDir==="asc"?"&#8593;":"&#8595;")+'</button>'); dir.onclick=function(){ sortDir=(sortDir==="asc")?"desc":"asc"; render(); }; right.appendChild(dir);
+    var gb=el('<select class="field" aria-label="Group by"><option value="date">Group: Date</option><option value="priority">Group: Priority</option><option value="list">Group: List</option><option value="none">Group: None</option></select>'); gb.value=groupBy; gb.onchange=function(){ groupBy=gb.value; render(); }; right.appendChild(gb);
+  }
+  var pf=el('<select class="field" aria-label="Filter by priority"><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>'); pf.value=prioFilter; pf.onchange=function(){ prioFilter=pf.value; render(); }; right.appendChild(pf);
+  var done=store.tasks.filter(function(t){return !t.deletedAt && t.completed && (view==="combined"||view==="today"||t.list===view);}).length;
+  if(done>0){ var cd=el('<button class="btn">Clear done</button>'); cd.onclick=clearDone; right.appendChild(cd); }
+  fr.appendChild(right); wrap.appendChild(fr);
+  return wrap;
+}
+
+function visibleTasks(){
+  var q=search.trim().toLowerCase();
+  var base=(view==="combined")?store.tasks.filter(function(t){return !t.deletedAt;}):store.tasks.filter(function(t){return t.list===view&&!t.deletedAt;});
+  return base.filter(function(t){ if(filter==="active"&&t.completed)return false; if(filter==="completed"&&!t.completed)return false; if(prioFilter!=="all"&&t.priority!==prioFilter)return false; if(q&&((t.title+" "+(t.notes||"")).toLowerCase().indexOf(q)<0))return false; return true; });
+}
+
+// sortable due key: "YYYY-MM-DDThh:mm" (no time -> end of day so timed items lead), null = no due date
+function dueKey(t){ return t.dueDate ? (t.dueDate + "T" + (t.dueTime || "99:99")) : null; }
+function titleCmp(a,b){ return (a.title||"").localeCompare((b.title||""), undefined, {sensitivity:"base", numeric:true}); }   // A-Z, number-aware
+function manualKey(t){ return (t.order!=null ? t.order : t.createdAt); }   // hand-arranged order (falls back to created)
+function sortTasks(arr){
+  var dir = (sortDir==="desc") ? -1 : 1;
+  return arr.slice().sort(function(a,b){
+    if(a.completed!==b.completed) return a.completed?1:-1;            // completed always last (not flipped)
+    var pc = PRIO_ORDER[a.priority]-PRIO_ORDER[b.priority];          // High -> Medium -> Low
+    var tc = titleCmp(a,b);                                          // final tiebreak: alphabetical
+    var r;
+    if(sortMode==="manual"){ r = (manualKey(a)-manualKey(b)) || (a.createdAt-b.createdAt); }
+    else if(sortMode==="created"){ r = (b.createdAt-a.createdAt) || tc; }   // newest first
+    else if(sortMode==="done"){ var ad=a.completedAt||0, bd=b.completedAt||0; r = (bd-ad) || (b.createdAt-a.createdAt); }   // most recently completed first
+    else if(sortMode==="alpha"){ r = tc || (a.createdAt-b.createdAt); }     // A -> Z
+    else if(sortMode==="priority"){ r = pc || tc; }
+    else { // due date: soonest (most overdue) first, no-date last -> priority -> alphabetical
+      var ka=dueKey(a), kb=dueKey(b);
+      if(ka!==kb){ r = (ka===null)?1:(kb===null)?-1:(ka<kb?-1:1); } else { r = pc || tc; }
+    }
+    return r * dir;
+  });
+}
+
+function groupSpec(){
+  if(groupBy==="priority") return { groups:[{k:"high",name:"High"},{k:"medium",name:"Medium"},{k:"low",name:"Low"}], of:function(t){return t.priority;}, set:function(id,k){ updateTask(id,{priority:k}); }, hint:function(g){return "Drop a task here to set "+g.name+" priority.";} };
+  if(groupBy==="list"){ var ls=(view==="combined")?["personal","work"]:[view]; return { groups:ls.map(function(l){return {k:l,name:(THEME[l]&&THEME[l].label)||l};}), of:function(t){return t.list;}, set:function(id,k){ updateTask(id,{list:k}); }, hint:function(g){return "Drop a task here to move it to "+g.name+".";} }; }
+  if(groupBy==="none") return { groups:[{k:"__all",name:null}], of:function(){return "__all";}, set:null, hint:function(){return "Nothing to show.";} };
+  return { groups:BUCKETS, of:function(t){return bucketOf(t);}, set:function(id,k){ moveToBucket(id,k); }, hint:function(g){ return g.k==="nodue"?"Nothing without a due date.":"Drop a task here to set it to "+g.name+"."; } };
+}
+function renderGroups(){
+  var wrap=el('<div id="groups" style="margin-top:16px"></div>');
+  var vis=visibleTasks();   // visibleTasks already applies All/Active/Completed (All shows both; completed sort to the bottom)
+  if(sortMode==="manual"){   // single hand-arranged list, drag handle reorders
+    wrap.appendChild(el('<div class="muted" style="font-size:13px; margin:0 4px 6px; display:flex; gap:6px; align-items:center">'+ic('grip')+' Drag the handle to reorder &middot; "My order". Change sort to leave it.</div>'));
+    var sect0=el('<div class="sect"></div>');
+    var list=sortTasks(vis);
+    if(list.length===0) sect0.appendChild(el('<div class="empty">Nothing to show.</div>'));
+    else list.forEach(function(t){ sect0.appendChild(renderTask(t)); });
+    wrap.appendChild(sect0);
+    return wrap;
+  }
+  var spec=groupSpec();
+  spec.groups.forEach(function(g){
+    var tasks=sortTasks(vis.filter(function(t){ return spec.of(t)===g.k; }));
+    if(tasks.length===0 && groupBy==="date" && (g.k==="nodue"||g.k==="earlier")) return;   // hide empty cleanup buckets
+    var isE=(groupBy==="date" && g.k==="earlier" && tasks.length>0);
+    var isT=(groupBy==="date" && g.k==="today" && tasks.length>0);
+    var hColor = isE?odC() : (isT?lA("today") : null);
+    var pillStyle = isE ? (darkMode?'background:#3a1d24;color:#fda4af':'background:#fff1f2;color:#be123c')
+                  : isT ? ('background:'+lS("today")+';color:'+lA("today"))
+                  : null;
+    var sect=el('<div class="sect" id="group-'+g.k+'" data-group="'+g.k+'"></div>');
+    var nameHtml = (g.name===null) ? "" : ('<h2'+(hColor?' style="color:'+hColor+'"':'')+'>'+esc(g.name)+'</h2> ');
+    var h=el('<div class="sect-h"><div class="left">'+nameHtml+'<span class="pill"'+(pillStyle?' style="'+pillStyle+'"':'')+'>'+tasks.length+'</span></div></div>');
+    sect.appendChild(h);
+    if(tasks.length===0){ sect.appendChild(el('<div class="empty">'+esc(spec.hint(g))+'</div>')); }
+    else tasks.forEach(function(t){ sect.appendChild(renderTask(t)); });
+    if(spec.set){
+      sect.ondragover=function(e){ if(dragId){ e.preventDefault(); if(e.dataTransfer)e.dataTransfer.dropEffect="move"; sect.classList.add("dropok"); } };
+      sect.ondragleave=function(e){ if(!sect.contains(e.relatedTarget)) sect.classList.remove("dropok"); };
+      sect.ondrop=function(e){ e.preventDefault(); sect.classList.remove("dropok"); var id=(e.dataTransfer&&e.dataTransfer.getData("text/plain"))||dragId; if(id) spec.set(id, g.k); };
+    }
+    wrap.appendChild(sect);
+  });
+  if(filter==="completed" && store.archive && store.archive.length){
+    wrap.appendChild(el('<div class="muted" style="font-size:12px; margin:10px 4px 0">'+store.archive.length+' completed task'+(store.archive.length===1?"":"s")+' older than '+ARCHIVE_AFTER_DAYS+' days '+(store.archive.length===1?"is":"are")+' archived in the data file (not shown here).</div>'));
+  }
+  return wrap;
+}
+
+// ---- inline meta editors (click a chip on the collapsed task) ----
+function openPop(id, kind){ if(popover && popover.id===id && popover.kind===kind){ popover=null; } else { popover={id:id, kind:kind}; menuOpen=null; } render(); }
+function buildDuePop(t){
+  var pop=el('<div class="editpop" role="dialog" aria-label="Edit due date"></div>');
+  pop.onclick=function(e){ e.stopPropagation(); };
+  var d=el('<input type="date" class="field" aria-label="Due date" />'); d.value=t.dueDate||""; d.onchange=function(){ updateTask(t.id,{dueDate:d.value||null, dueTime:d.value?t.dueTime:null}); }; pop.appendChild(d);
+  var quick=el('<div class="row" style="gap:6px; flex-wrap:wrap"></div>');
+  function qa(label,val){ var b=el('<button type="button" class="chip">'+label+'</button>'); b.onclick=function(){ updateTask(t.id,{dueDate:val, dueTime:val?t.dueTime:null}); }; return b; }
+  quick.appendChild(qa("Today",todayStr())); quick.appendChild(qa("Tomorrow",addDays(todayStr(),1)));
+  var clr=el('<button type="button" class="chip">Clear</button>'); clr.onclick=function(){ updateTask(t.id,{dueDate:null,dueTime:null}); }; quick.appendChild(clr);
+  pop.appendChild(quick);
+  // reminder (only when a date is set)
+  if(t.dueDate){
+    var on=!!t.dueTime;
+    var rem=el('<button type="button" class="chip" aria-pressed="'+on+'" style="'+(on?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>');
+    rem.onclick=function(){ updateTask(t.id,{dueTime: on?null:"09:00"}); };
+    pop.appendChild(rem);
+    if(on){ var tm=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||"09:00"}); }); pop.appendChild(tm); }
+  }
+  return pop;
+}
+function buildPrioPop(t){
+  var pop=el('<div class="editpop" role="dialog" aria-label="Edit priority" style="min-width:150px"></div>');
+  pop.onclick=function(e){ e.stopPropagation(); };
+  ["high","medium","low"].forEach(function(p){ var mp=PRIO[p]; var active=t.priority===p; var b=el('<button type="button" class="chip" aria-pressed="'+active+'" style="justify-content:flex-start'+(active?";background:"+pBg(p)+";color:"+pT(p)+";border-color:"+pBd(p):"")+'"><span aria-hidden="true" style="width:8px;height:8px;border-radius:9999px;background:'+mp.dot+';display:inline-block"></span> '+mp.label+'</button>'); b.onclick=function(){ popover=null; updateTask(t.id,{priority:p}); }; pop.appendChild(b); });
+  return pop;
+}
+function buildNotePop(t){
+  var pop=el('<div class="editpop" role="dialog" aria-label="Note" style="min-width:min(420px,92vw)"></div>');
+  pop.onclick=function(e){ e.stopPropagation(); };
+  var ta=el('<textarea class="field" rows="10" aria-label="Note" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; min-height:220px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
+  var nLink=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px; justify-self:start" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLink.onclick=function(){ insertLinkAtCursor(ta); };
+  pop.appendChild(nLink); pop.appendChild(ta);
+  if(noteHasLink(t.notes)){ var npv=el('<div class="note-preview"></div>'); npv.innerHTML=linkifyNotes(t.notes); pop.appendChild(npv); }
+  return pop;
+}
+function buildListPop(t){
+  var pop=el('<div class="editpop" role="dialog" aria-label="Move to list" style="min-width:150px"></div>');
+  pop.onclick=function(e){ e.stopPropagation(); };
+  ["personal","work"].forEach(function(l){ var active=t.list===l; var b=el('<button type="button" class="chip" aria-pressed="'+active+'" style="justify-content:flex-start; color:'+lA(l)+(active?";border-color:"+lA(l)+";background:"+lS(l):"")+'">'+esc(THEME[l].label)+'</button>'); b.onclick=function(){ popover=null; updateTask(t.id,{list:l}); }; pop.appendChild(b); });
+  return pop;
+}
+function buildRecurPop(t){
+  var pop=el('<div class="editpop" role="dialog" aria-label="Repeat" style="min-width:180px"></div>');
+  pop.onclick=function(e){ e.stopPropagation(); };
+  ["none","daily","weekdays","weekly","monthly","yearly"].forEach(function(r){ var active=(t.recur||"none")===r; var b=el('<button type="button" class="chip" aria-pressed="'+active+'" style="justify-content:flex-start'+(active?(darkMode?";background:#22243a;color:#a5b4fc;border-color:#3a3f63":";background:#eef2ff;color:#4338ca;border-color:#c7d2fe"):"")+'">'+(r==="none"?"":ic('repeat')+" ")+esc(RECUR_LABEL[r])+'</button>'); b.onclick=function(){ popover=null; updateTask(t.id,{recur:r}); }; pop.appendChild(b); });
+  return pop;
+}
+
+function renderTask(t){
+  var meta=PRIO[t.priority];
+  var node=el('<div class="task'+(selected[t.id]?' sel':'')+'" style="border-left-color:'+meta.dot+'"></div>');
+  if(view!=="today" && !selectMode){
+    var grip=el('<button class="grip" draggable="true" data-grip="'+t.id+'" title="Drag to reschedule (or use arrow keys)" aria-label="Reschedule '+esc(t.title)+'. Use up and down arrow keys to move between Earlier, Today, Tomorrow, Later and No Due Date.">'+ic('grip')+'</button>');
+    grip.ondragstart=function(e){ dragId=t.id; node.classList.add("dragging"); if(e.dataTransfer){ e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", t.id); }catch(_){ } try{ e.dataTransfer.setDragImage(node,12,12); }catch(_){ } } };
+    grip.ondragend=function(){ dragId=null; node.classList.remove("dragging"); var ds=document.querySelectorAll(".sect.dropok,.task.dropbefore"); for(var i=0;i<ds.length;i++){ ds[i].classList.remove("dropok"); ds[i].classList.remove("dropbefore"); } };
+    grip.onkeydown=function(e){
+      if(sortMode==="manual"){ return; }   // arrow-key bucket move only applies to date grouping
+      var ks=BUCKETS.map(function(b){return b.k;}); var i=ks.indexOf(bucketOf(t)); var ni=-1; if(e.key==="ArrowDown"||e.key==="ArrowRight")ni=Math.min(ks.length-1,i+1); else if(e.key==="ArrowUp"||e.key==="ArrowLeft")ni=Math.max(0,i-1); if(ni>=0 && ni!==i){ e.preventDefault(); moveToBucket(t.id, ks[ni]); var g2=document.querySelector('[data-grip="'+t.id+'"]'); if(g2)g2.focus(); } };
+    node.appendChild(grip);
+  }
+  if(sortMode==="manual" && view!=="today" && !selectMode){   // task rows are reorder drop targets in My order
+    node.ondragover=function(e){ if(dragId && dragId!==t.id){ e.preventDefault(); node.classList.add("dropbefore"); } };
+    node.ondragleave=function(e){ if(!node.contains(e.relatedTarget)) node.classList.remove("dropbefore"); };
+    node.ondrop=function(e){ e.preventDefault(); node.classList.remove("dropbefore"); var id=(e.dataTransfer&&e.dataTransfer.getData("text/plain"))||dragId; if(id && id!==t.id) reorderTask(id, t.id); };
+  }
+  if(selectMode){ var sc=el('<button class="selcb'+(selected[t.id]?' on':'')+'" role="checkbox" aria-checked="'+(!!selected[t.id])+'" aria-label="Select task: '+esc(t.title)+' (Shift-click for range)">'+(selected[t.id]?"&#10003;":"")+'</button>'); sc.onclick=function(e){ e.stopPropagation();
+      if(e.shiftKey && selAnchor && selAnchor!==t.id){
+        var ids=visibleOrderedIds(); var i1=ids.indexOf(selAnchor), i2=ids.indexOf(t.id);
+        if(i1>=0&&i2>=0){ var lo=Math.min(i1,i2), hi=Math.max(i1,i2); for(var k=lo;k<=hi;k++) selected[ids[k]]=true; }
+      } else { selected[t.id]=!selected[t.id]; selAnchor=t.id; }
+      render();
+    }; node.appendChild(sc); }
+  var cb=el('<button class="cb'+(t.completed?" done":"")+'" role="checkbox" aria-checked="'+t.completed+'" aria-label="'+(t.completed?"Mark incomplete":"Mark complete")+': '+esc(t.title)+'">'+(t.completed?"&#10003;":"")+'</button>'); cb.onclick=function(){ toggleComplete(t.id); }; node.appendChild(cb);
+  var mid=el('<div style="flex:1; min-width:0"></div>');
+  var ti=el('<div class="titleInput taskTitle'+(t.completed?" done":"")+'" contenteditable="true" role="textbox" aria-multiline="false" aria-label="Task title" spellcheck="false" style="width:100%; font-weight:500"></div>'); ti.textContent=t.title;
+  ti.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); ti.blur(); } };
+  ti.onblur=function(){ var v=(ti.textContent||"").replace(/\s+/g," ").trim(); if(!v){ ti.textContent=t.title; return; } if(v!==t.title) updateTask(t.id,{title:v}); };
+  mid.appendChild(ti);
+  var m=el('<div class="meta"></div>');
+  if(view==="combined"){
+    var listWrap=el('<span style="position:relative; display:inline-flex"></span>');
+    var listBtn=el('<button type="button" class="metachip" data-metachip="1" aria-haspopup="dialog" aria-expanded="'+(!!(popover&&popover.id===t.id&&popover.kind==="list"))+'" title="Click to change list" style="color:'+lA(t.list)+'; font-weight:600">'+esc(THEME[t.list].label)+'</button>');
+    listBtn.onclick=function(e){ e.stopPropagation(); openPop(t.id,"list"); };
+    listWrap.appendChild(listBtn);
+    if(popover&&popover.id===t.id&&popover.kind==="list") listWrap.appendChild(buildListPop(t));
+    m.appendChild(listWrap);
+  }
+
+  // due date — click to edit
+  var dueWrap=el('<span style="position:relative; display:inline-flex"></span>');
+  var dueColor=!t.dueDate?(darkMode?"#a8a29e":"#94a3b8"):overdue(t)?odC():(t.dueDate===todayStr()?lA("today"):(darkMode?"#a8a29e":"#64748b"));
+  var dueTxt=t.dueDate?(esc(fmtDue(t.dueDate,t.dueTime))+(overdue(t)?" &middot; overdue":"")):"Add date";
+  var dueIcon=overdue(t)?ic('alert'):(t.dueTime?ic('bell'):ic('calendar'));   // alert shape = overdue cue that doesn't rely on color
+  var dueBtn=el('<button type="button" class="metachip" data-metachip="1" aria-haspopup="dialog" aria-expanded="'+(!!(popover&&popover.id===t.id&&popover.kind==="due"))+'" title="Click to change due date / reminder" style="color:'+dueColor+'">'+dueIcon+' '+dueTxt+'</button>');
+  dueBtn.onclick=function(e){ e.stopPropagation(); openPop(t.id,"due"); };
+  dueWrap.appendChild(dueBtn);
+  if(popover&&popover.id===t.id&&popover.kind==="due") dueWrap.appendChild(buildDuePop(t));
+  m.appendChild(dueWrap);
+
+  // (note now shown as an always-visible one-line field below the meta row — see quick-note below)
+
+  // priority — click to change
+  var prioWrap=el('<span style="position:relative; display:inline-flex"></span>');
+  var prioBtn=el('<button type="button" class="metachip" data-metachip="1" aria-haspopup="dialog" aria-expanded="'+(!!(popover&&popover.id===t.id&&popover.kind==="prio"))+'" title="Click to change priority" style="color:'+pT(t.priority)+'; font-weight:500">'+ic('flag')+' '+meta.label+'</button>');
+  prioBtn.onclick=function(e){ e.stopPropagation(); openPop(t.id,"prio"); };
+  prioWrap.appendChild(prioBtn);
+  if(popover&&popover.id===t.id&&popover.kind==="prio") prioWrap.appendChild(buildPrioPop(t));
+  m.appendChild(prioWrap);
+
+  // recurrence — shown only when repeating; click to change
+  if(t.recur && t.recur!=="none"){
+    var recWrap=el('<span style="position:relative; display:inline-flex"></span>');
+    var recBtn=el('<button type="button" class="metachip muted" data-metachip="1" aria-haspopup="dialog" aria-expanded="'+(!!(popover&&popover.id===t.id&&popover.kind==="recur"))+'" title="Click to change repeat">'+ic('repeat')+' '+esc(RECUR_LABEL[t.recur]||"Repeats")+'</button>');
+    recBtn.onclick=function(e){ e.stopPropagation(); openPop(t.id,"recur"); };
+    recWrap.appendChild(recBtn);
+    if(popover&&popover.id===t.id&&popover.kind==="recur") recWrap.appendChild(buildRecurPop(t));
+    m.appendChild(recWrap);
+  }
+
+  // completed timestamp (read-only)
+  if(t.completed && t.completedAt){ m.appendChild(el('<span class="metachip muted" style="cursor:default" title="Completed '+esc(new Date(t.completedAt).toLocaleString())+'">'+ic('check')+' Done '+esc(fmtStamp(t.completedAt))+'</span>')); }
+
+  mid.appendChild(m);
+  // quick one-line note (collapsed view only): type to add a note without expanding; expand for long/multi-line notes
+  if(!expanded[t.id] && !selectMode){
+    var nt=t.notes||"";
+    if(nt.indexOf("\n")>=0 || noteHasLink(nt)){   // multi-line or has a link -> clickable preview (links open; clicking elsewhere opens the editor)
+      var fl=nt.split("\n")[0]||"(note)";
+      var multi=nt.indexOf("\n")>=0;
+      var prev=el('<div class="qnote-prev" title="Click to edit (links open in a new tab)"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+linkifyNotes(fl)+'</span>'+(multi?' <span class="more">&#8943; more</span>':'')+'</div>');
+      prev.onclick=function(e){ if(e.target.closest("a")) return; e.stopPropagation(); expanded[t.id]=true; render(); };
+      mid.appendChild(prev);
+    } else {
+      var qn=el('<input class="qnote" aria-label="Quick note for '+esc(t.title)+'" placeholder="Add a note&hellip;" />'); qn.value=nt;
+      qn.onclick=function(e){ e.stopPropagation(); };
+      qn.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); qn.blur(); } else if(e.key==="Escape"){ qn.value=nt; qn.blur(); } };
+      qn.onchange=function(){ saveNoteQuiet(t.id, qn.value); };   // commit without re-render so a focus-stealing click (e.g. expand) still lands
+      mid.appendChild(qn);
+    }
+  }
+  node.appendChild(mid);
+
+  var actions=el('<div style="position:relative; display:flex; gap:2px"></div>');
+  var cal=el('<button class="iconbtn calbtn" data-calbtn="1" title="Add to calendar" aria-label="Add to calendar: '+esc(t.title)+'" aria-haspopup="menu" aria-expanded="'+(menuOpen===t.id)+'">'+ic('calplus')+'</button>'); cal.onclick=function(e){ e.stopPropagation(); popover=null; menuOpen=(menuOpen===t.id)?null:t.id; render(); }; actions.appendChild(cal);
+  if(menuOpen===t.id){
+    var menu=el('<div class="menu" role="menu"></div>');
+    var b1=el('<button '+(t.dueDate?"":"disabled")+'>'+ic('download')+' Download .ics (time block)</button>'); b1.onclick=function(){ if(t.dueDate){ downloadText(buildICS(t,"block"), (t.title.replace(/[^a-z0-9]+/gi,"-").toLowerCase().slice(0,40)||"task")+".ics"); menuOpen=null; render(); } };
+    var b2=el('<button '+(t.dueDate?"":"disabled")+'>'+ic('download')+' Download .ics (reminder)</button>'); b2.onclick=function(){ if(t.dueDate){ downloadText(buildICS(t,"reminder"), (t.title.replace(/[^a-z0-9]+/gi,"-").toLowerCase().slice(0,40)||"task")+".ics"); menuOpen=null; render(); } };
+    var a1=el('<a class="calllink" target="_blank" href="'+gcalUrl(t)+'">'+ic('external')+' Add to Google Calendar</a>');
+    var a2=el('<a class="calllink" target="_blank" href="'+outlookUrl(t)+'">'+ic('external')+' Add to Outlook Calendar</a>');
+    menu.appendChild(b1); menu.appendChild(b2); menu.appendChild(a1); menu.appendChild(a2);
+    actions.appendChild(menu);
+  }
+  var edit=el('<button class="iconbtn" title="Details" aria-label="Toggle details for: '+esc(t.title)+'" aria-expanded="'+(!!expanded[t.id])+'">'+(expanded[t.id]?ic('chevdown'):ic('chevright'))+'</button>'); edit.onclick=function(){ expanded[t.id]=!expanded[t.id]; render(); }; actions.appendChild(edit);
+  var del=el('<button class="iconbtn" title="Delete" aria-label="Delete task: '+esc(t.title)+'" style="color:#cbd5e1">'+ic('trash')+'</button>'); del.onclick=function(){ delTask(t.id); }; actions.appendChild(del);
+  node.appendChild(actions);
+
+  if(expanded[t.id]){
+    var wrap=el('<div style="flex-basis:100%; width:100%"></div>');
+    var d=el('<div class="details"></div>');
+    var g2=el('<div class="grid2"></div>');
+    var dd=el('<input type="date" class="field" aria-label="Due date" />'); dd.value=t.dueDate||""; dd.onchange=function(){ updateTask(t.id,{dueDate:dd.value||null, dueTime: dd.value?t.dueTime:null}); };
+    var remOn=!!t.dueTime;
+    var remBtn=el('<button type="button" class="chip" aria-pressed="'+remOn+'"'+(t.dueDate?"":" disabled")+' style="'+(remOn?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>'); remBtn.onclick=function(){ if(t.dueDate) updateTask(t.id,{dueTime: remOn?null:"09:00"}); };
+    g2.appendChild(el('<label class="lbl">Due date</label>')); g2.appendChild(el('<label class="lbl">Reminder</label>'));
+    g2.appendChild(dd); g2.appendChild(remBtn); d.appendChild(g2);
+    if(remOn){ var dt2=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||"09:00"}); }); var rrow=el('<div class="row" style="gap:8px; align-items:center"></div>'); rrow.appendChild(el('<label class="lbl">Remind at</label>')); rrow.appendChild(dt2); d.appendChild(rrow); }
+    var pr=el('<div class="row" style="gap:6px"></div>');
+    pr.setAttribute("role","group"); pr.setAttribute("aria-label","Priority");
+    ["high","medium","low"].forEach(function(p){ var meta2=PRIO[p]; var active=t.priority===p; var b=el('<button class="chip" aria-pressed="'+active+'" aria-label="Priority '+meta2.label+'" style="'+(active?"background:"+pBg(p)+"; color:"+pT(p)+"; border-color:"+pBd(p):"")+'"><span aria-hidden="true" style="width:8px;height:8px;border-radius:9999px;background:'+meta2.dot+';display:inline-block"></span>'+meta2.label+'</button>'); b.onclick=function(){ updateTask(t.id,{priority:p}); }; pr.appendChild(b); });
+    d.appendChild(pr);
+    var g3=el('<div class="grid2"></div>');
+    g3.appendChild(el('<label class="lbl">Repeats</label>'));
+    g3.appendChild(el('<label class="lbl">List</label>'));
+    var recSel=el('<select class="field" aria-label="Repeats"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekdays">Every weekday</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Annually</option></select>'); recSel.value=t.recur||"none"; recSel.onchange=function(){ updateTask(t.id,{recur:recSel.value}); };
+    var listSel2=el('<select class="field" aria-label="List"><option value="personal">Personal</option><option value="work">Work</option></select>'); listSel2.value=t.list; listSel2.onchange=function(){ updateTask(t.id,{list:listSel2.value}); };
+    g3.appendChild(recSel); g3.appendChild(listSel2); d.appendChild(g3);
+    var ta=el('<textarea class="field" rows="6" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description. Tip: click Link or paste a URL" style="width:100%; min-height:140px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
+    var nHead=el('<div class="row" style="gap:8px; align-items:center"></div>'); nHead.appendChild(el('<label class="lbl" style="margin-right:auto">Notes</label>'));
+    var nLink=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLink.onclick=function(){ insertLinkAtCursor(ta); }; nHead.appendChild(nLink);
+    d.appendChild(nHead); d.appendChild(ta);
+    if(noteHasLink(t.notes)){ d.appendChild(el('<div class="lbl" style="margin-top:2px">Preview</div>')); var npv=el('<div class="note-preview"></div>'); npv.innerHTML=linkifyNotes(t.notes); d.appendChild(npv); }
+    // task ID (for reference / matching the [taskhub:id] tag in Microsoft To Do) — click to copy
+    var idRow=el('<div class="muted" style="font-size:12px; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">Task ID: <code style="font-family:Consolas,monospace; background:'+(darkMode?"#1c1b19":"#f1f5f9")+'; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; padding:1px 6px; border-radius:6px">'+esc(t.id)+'</code></div>');
+    var copyId=el('<button type="button" class="btn" style="padding:3px 8px; font-size:12px" title="Copy task ID">'+ic('checksq')+' Copy</button>');
+    copyId.onclick=function(){ if(navigator.clipboard){ navigator.clipboard.writeText(t.id).then(function(){toast("Task ID copied");},function(){toast(t.id);}); } else { toast(t.id); } };
+    idRow.appendChild(copyId); d.appendChild(idRow);
+    wrap.appendChild(d); node.appendChild(wrap);
+  }
+  return node;
+}
+
+// ---------------- events ----------------
+var SHOWAS={ busy:{l:"Busy",c:"#4338ca",b:"#eef2ff",cD:"#a5b4fc",bD:"#262445"}, free:{l:"Free",c:"#047857",b:"#ecfdf5",cD:"#34d399",bD:"#10271e"}, oof:{l:"Out of office",c:"#be123c",b:"#fff1f2",cD:"#fb7185",bD:"#2e1820"}, tentative:{l:"Tentative",c:"#b45309",b:"#fffbeb",cD:"#fbbf24",bD:"#2e2410"}, workingElsewhere:{l:"Elsewhere",c:"#0369a1",b:"#f0f9ff",cD:"#38bdf8",bD:"#102733"} };
+function showAs(key){ var s=SHOWAS[key]||SHOWAS.busy; return { l:s.l, c:darkMode?s.cD:s.c, b:darkMode?s.bD:s.b }; }
+function clockMin(s){ if(!s)return 9999; var m=s.match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m)return 9999; var h=parseInt(m[1],10)%12; if(m[3].toUpperCase()==="PM")h+=12; return h*60+parseInt(m[2],10); }
+function evDayLabel(ds){ var p=ds.split("-").map(Number); var dt=new Date(p[0],p[1]-1,p[2]); var t0=new Date(); t0.setHours(0,0,0,0); var diff=Math.round((dt-t0)/86400000); if(diff===0)return "Today"; if(diff===1)return "Tomorrow"; return dt.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }
+var evOpen=false, hideDeclined=true;
+function renderEvents(){
+  var card=el('<div class="card" style="margin-top:16px; overflow:hidden"></div>');
+  var all=eventsList();
+  var filtered=all.filter(function(e){ return !(hideDeclined && e.title.indexOf("Declined:")===0); });
+  var head=el('<div class="row" role="button" tabindex="0" aria-expanded="'+evOpen+'" aria-label="Upcoming events, '+filtered.length+' shown" style="padding:12px 16px; cursor:pointer"></div>');
+  head.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); evOpen=!evOpen; render(); } };
+  var next=filtered.filter(function(e){return !e.allDay;})[0]||filtered[0];
+  head.innerHTML='<div style="width:34px;height:34px;border-radius:8px;background:'+(darkMode?"#262445":"#eef2ff")+';color:'+(darkMode?"#a5b4fc":"#6366f1")+';display:flex;align-items:center;justify-content:center">'+ic('calendar',18)+'</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px">Upcoming Events</b> <span class="pill">'+filtered.length+'</span>'+(liveEvents?' <span class="pill" style="background:'+(darkMode?"#10271e":"#dcfce7")+';color:'+(darkMode?"#34d399":"#166534")+'">Live</span>':'')+'</div><div class="muted" style="font-size:13px">'+(evOpen?("Outlook &middot; "+esc(evRangeLabel())):(next?esc(next.title).slice(0,46):"No events"))+'</div></div><div class="muted">'+(evOpen?"&#9662;":"&#9656;")+'</div>';
+  head.onclick=function(){ evOpen=!evOpen; render(); };
+  card.appendChild(head);
+  if(evOpen){
+    var body=el('<div style="border-top:1px solid '+(darkMode?"#38332e":"#eef0f4")+'; padding:12px 16px"></div>');
+    // sync status + controls
+    var sync=el('<div class="row" style="flex-wrap:wrap; gap:8px; margin-bottom:10px"></div>');
+    if(liveEvents){ sync.appendChild(el('<span class="muted" style="font-size:13px">'+ic('check')+' Auto-synced from Outlook via Power Automate &middot; '+esc(evSyncedAt())+'</span>')); }
+    else { sync.appendChild(el('<span class="muted" style="font-size:13px">'+(EVENTS_SNAPSHOT.length?('Read-only snapshot &middot; synced '+esc(EVENTS_SYNCED_AT)):'Calendar not connected yet &middot; use Connect Outlook sync')+'</span>')); }
+    if(fsSupported){
+      if(eventsNeedsReconnect){ var rc=el('<button class="btn" style="padding:5px 10px">'+ic('link')+' Reconnect Outlook sync</button>'); rc.onclick=function(e){ e.stopPropagation(); readEvents(false); }; sync.appendChild(rc); }
+      else if(eventsHandle){ var rf=el('<button class="btn" style="padding:5px 10px">'+ic('repeat')+' Refresh</button>'); rf.onclick=function(e){ e.stopPropagation(); readEvents(false); }; sync.appendChild(rf); }
+      else { var cn=el('<button class="btn" style="padding:5px 10px">'+ic('bolt')+' Connect Outlook sync</button>'); cn.onclick=function(e){ e.stopPropagation(); connectEventsFile(); }; sync.appendChild(cn); }
+    }
+    body.appendChild(sync);
+    if(!liveEvents && fsSupported && !eventsHandle){ body.appendChild(el('<div class="muted" style="font-size:12px; margin-bottom:8px">Set up a Power Automate flow to write <code>taskhub-events.json</code> from Outlook, then <b>Connect Outlook sync</b> to point at it (reconnects automatically after). See <code>TaskHub-PowerAutomate-Events.docx</code> in this folder. Or keep asking the Dust agent to refresh.</div>')); }
+    var declinedCount=all.filter(function(e){return e.title.indexOf("Declined:")===0;}).length;
+    if(declinedCount>0){ var dtog=el('<button class="btn" style="margin-bottom:10px" aria-pressed="'+(!hideDeclined)+'">'+(hideDeclined?("Show "+declinedCount+" declined"):"Hide declined")+'</button>'); dtog.onclick=function(e){ e.stopPropagation(); hideDeclined=!hideDeclined; render(); }; body.appendChild(dtog); }
+    var byDay={}; var order=[];
+    filtered.forEach(function(e){ if(!byDay[e.date]){byDay[e.date]=[]; order.push(e.date);} byDay[e.date].push(e); });
+    order.sort();
+    order.forEach(function(date){
+      body.appendChild(el('<div class="evday">'+esc(evDayLabel(date))+'</div>'));
+      byDay[date].slice().sort(function(a,b){ if(a.allDay!==b.allDay)return a.allDay?-1:1; return clockMin(a.start)-clockMin(b.start); }).forEach(function(e){
+        body.appendChild(renderEventRow(e));
+      });
+    });
+    card.appendChild(body);
+  }
+  return card;
+}
+
+// ---------------- today view ----------------
+function renderToday(){
+  var wrap=el('<div style="margin-top:16px"></div>');
+  var tk=todayStr();
+  var dt=new Date(); var dl=dt.toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric"});
+  var od=store.tasks.filter(function(t){return !t.deletedAt&&!t.completed&&t.dueDate&&t.dueDate<tk;}).sort(function(a,b){return a.dueDate<b.dueDate?-1:1;});
+  var due=sortTasks(store.tasks.filter(function(t){return !t.deletedAt&&t.dueDate===tk;}));
+  var noDue=store.tasks.filter(function(t){return !t.deletedAt&&!t.completed&&!t.dueDate;});
+  var evs=eventsList().filter(function(e){return e.date===tk && e.title.indexOf("Declined:")!==0;}).sort(function(a,b){ if(a.allDay!==b.allDay)return a.allDay?-1:1; return clockMin(a.start)-clockMin(b.start); });
+  wrap.appendChild(el('<div class="card" style="padding:12px 16px; background:'+lS('today')+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'"><div style="font-size:13px;font-weight:700;text-transform:uppercase;color:'+lA('today')+'">'+esc(dl)+'</div><div style="font-size:16px;color:'+(darkMode?"#cdc8c2":"#475569")+';margin-top:2px">'+(od.length?('<b style="color:'+odC()+'">'+od.length+' overdue &middot; </b>'):'')+due.filter(function(t){return !t.completed;}).length+' due &middot; '+evs.length+' events</div></div>'));
+
+  // quick add
+  var qa=el('<div class="card row" style="margin-top:12px; padding:8px"></div>');
+  var qsel=el('<select class="field" aria-label="List"><option value="personal">Personal</option><option value="work">Work</option></select>'); qsel.value=addList; qsel.onchange=function(){ addList=qsel.value; };
+  var qinp=el('<input id="addInput" class="titleInput" aria-label="New task for today" placeholder="Add a task for today..." />');
+  var qbtn=el('<button class="btn btn-primary" style="background:'+THEME.today.grad+'">Add</button>');
+  function qadd(){ var v=(qinp.value||"").trim(); if(!v){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; } addTask(v, qsel.value, null, "medium", tk, null, ""); var a2=document.getElementById("addInput"); if(a2)a2.focus(); }
+  qbtn.onclick=qadd; qinp.onkeydown=function(e){ if(e.key==="Enter")qadd(); };
+  qa.appendChild(qsel); qa.appendChild(qinp); qa.appendChild(qbtn); wrap.appendChild(qa);
+
+  function block(title,list){ var s=el('<div class="sect"></div>'); s.appendChild(el('<div class="sect-h"><div class="left"><h2>'+title+'</h2> <span class="pill">'+list.length+'</span></div></div>')); if(list.length===0)s.appendChild(el('<div class="empty">Nothing here.</div>')); else list.forEach(function(t){ s.appendChild(renderTask(t)); }); return s; }
+  if(od.length) wrap.appendChild(block('<span style="color:'+odC()+'">Overdue</span>',od));
+  wrap.appendChild(block('<span style="color:'+lA("today")+'">Due Today</span>',due));
+  if(noDue.length) wrap.appendChild(block("No Due Date",noDue));
+  // On narrow screens the right rail is hidden, so show today's calendar inline here too.
+  var ec=el('<div class="sect rail-fallback"></div>'); ec.appendChild(el('<div class="sect-h"><div class="left"><h2><span style="color:'+lA("today")+'">Today\'s Calendar</span></h2> <span class="pill">'+evs.length+'</span></div></div>'));
+  if(evs.length===0)ec.appendChild(el('<div class="empty">No Outlook events today.</div>'));
+  else evs.forEach(function(e){ ec.appendChild(renderEventRow(e)); });
+  wrap.appendChild(ec);
+  return wrap;
+}
+
+// shared event row markup (used by Upcoming Events panel, Today view, and the Today rail)
+function renderEventRow(e){
+  var sa=showAs(e.showAs);
+  var ev=el('<div class="ev"></div>');
+  ev.appendChild(el('<div class="time">'+(e.allDay?'<span class="muted" style="font-size:13px;font-weight:600">All day</span>':('<div style="font-size:13px;font-weight:700">'+esc(e.start||"")+'</div><div style="font-size:12px" class="muted">'+esc(e.end||"")+'</div>'))+'</div>'));
+  ev.appendChild(el('<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:500">'+esc(e.title)+'</div><div style="margin-top:2px"><span class="pill" style="background:'+sa.b+'; color:'+sa.c+'">'+sa.l+'</span>'+(e.teams?' <span style="font-size:13px;color:'+(darkMode?"#38bdf8":"#0284c7")+';font-weight:600">'+ic('video')+' Teams</span>':'')+'</div></div>'));
+  return ev;
+}
+
+// sticky desktop rail: today's Outlook calendar, always expanded
+function renderTodayCalendar(){
+  var tk=todayStr();
+  var dt=new Date(); var dl=dt.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  var evs=eventsList().filter(function(e){return e.date===tk && e.title.indexOf("Declined:")!==0;}).sort(function(a,b){ if(a.allDay!==b.allDay)return a.allDay?-1:1; return clockMin(a.start)-clockMin(b.start); });
+  var card=el('<div class="card" style="overflow:hidden"></div>');
+  var head=el('<div style="padding:12px 16px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
+  head.innerHTML='<div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px;color:'+lA("today")+'">Today\'s Calendar</b> <span class="pill" style="background:'+lS("today")+';color:'+lA("today")+'">'+evs.length+'</span></div><div class="muted" style="font-size:13px;margin-top:2px">'+esc(dl)+'</div>';
+  card.appendChild(head);
+  var body=el('<div style="padding:8px 16px 12px"></div>');
+  if(evs.length===0) body.appendChild(el('<div class="empty" style="padding:14px 0">No Outlook events today.</div>'));
+  else evs.forEach(function(e){ body.appendChild(renderEventRow(e)); });
+  card.appendChild(body);
+  return card;
+}
+
+// ---------------- modal ----------------
+function renderModal(){
+  var bg=el('<div class="modal-bg"></div>'); bg.onclick=function(e){ if(e.target===bg){ closeModal(); } };
+  var m=el('<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>');
+  var mh=el('<div class="modal-h"></div>');
+  mh.appendChild(el('<b id="modalTitle">'+(modal==="export"?"Export backup":modal==="automate"?"Sync to Microsoft To Do":modal==="trash"?"Recently deleted":modal==="ai"?"AI assistant (Dust)":modal==="aiReview"?"Review AI suggestions":"Import backup")+'</b>'));
+  var xb=el('<button class="iconbtn" aria-label="Close dialog">'+ic('x')+'</button>'); xb.onclick=closeModal; mh.appendChild(xb);
+  m.appendChild(mh);
+  var b=el('<div class="modal-b"></div>');
+  if(modal==="export"){
+    b.appendChild(el('<div class="muted" style="font-size:13px">Copy this JSON and paste it to the Dust agent for a saved backup &mdash; or download it.</div>'));
+    var ta=el('<textarea class="json" readonly></textarea>'); ta.value=exportJson(); b.appendChild(ta);
+    var row=el('<div class="row" style="justify-content:flex-end; gap:8px"></div>');
+    var dl=el('<button class="btn">'+ic('download')+' Download .json</button>'); dl.onclick=function(){ var d=new Date(); downloadText(exportJson(), "taskhub-backup-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+".json"); };
+    var cp=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Copy JSON</button>'); cp.onclick=function(){ ta.focus(); ta.select(); var ok=false; try{ ok=document.execCommand("copy"); }catch(e){} if(navigator.clipboard){ navigator.clipboard.writeText(ta.value).then(function(){toast("Copied");}, function(){}); } toast(ok?"Copied":"Selected - press Ctrl+C"); };
+    row.appendChild(dl); row.appendChild(cp); b.appendChild(row);
+  } else if(modal==="automate"){
+    b.appendChild(el('<div class="muted" style="font-size:13px">One-way sync to <b>Microsoft To&nbsp;Do</b> via <b>Power Automate</b>. It runs whenever your linked <code>taskhub-data.json</code> changes (which happens when you edit a task here) and reads the ready-made <code>todo</code> feed in that file. Matching is by a hidden <code>[taskhub:id]</code> tag, so re-runs <b>update</b> tasks instead of duplicating.</div>'));
+    if(!fileHandle){ b.appendChild(el('<div class="warn">'+ic('alert')+' <span>First click <b>Link all</b> (top toolbar) and pick <b>taskhub-data.json</b> (and your events / inbox files) so the app auto-saves and syncs (it then reconnects automatically).</span></div>')); }
+    var steps=el('<ol style="font-size:14px; line-height:1.6; margin:0; padding-left:20px"></ol>');
+    steps.innerHTML='<li><b>Trigger:</b> OneDrive for Business &rarr; <b>When a file is modified</b> &mdash; Folder = the folder holding <code>taskhub-data.json</code> (pick the folder, not a file).</li>'
+      +'<li><b>Condition</b> (so it only runs for the data file): <code>triggerOutputs()?[\'headers\']?[\'x-ms-file-name\']</code> <b>is equal to</b> <code>taskhub-data.json</code>. &#9888; Use that expression &mdash; the plain "File name" token is base64-encoded. Put everything below in the <b>True</b> branch.</li>'
+      +'<li><b>OneDrive &rarr; Get file content using path</b> &rarr; <code>taskhub-data.json</code>.</li>'
+      +'<li><b>Parse JSON</b> &mdash; Content = <code>base64ToString(body(\'Get_file_content_using_path\')?[\'$content\'])</code>; Schema = below.</li>'
+      +'<li><b>Microsoft To&nbsp;Do &rarr; List to-do\'s by folder</b> (your list).</li>'
+      +'<li><b>Apply to each</b> over the <code>todo</code> array &rarr; <b>Filter array</b> on the <code>[taskhub:id]</code> tag &rarr; <b>Condition</b>: <b>Update to-do</b> if matched, else <b>Add a to-do</b> &mdash; mapping the fields below.</li>';
+    b.appendChild(steps);
+    var map=el('<div style="font-size:13px; display:grid; gap:4px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px"></div>');
+    map.innerHTML='<div style="font-weight:700; margin-bottom:2px">To&nbsp;Do field &larr; feed field</div>'
+      +'<div>Title &larr; <code>title</code></div>'
+      +'<div>Body content &larr; <code>bodyContent</code></div>'
+      +'<div>Importance &larr; <code>importance</code> (high / normal / low)</div>'
+      +'<div>Status &larr; <code>status</code> (notStarted / completed)</div>'
+      +'<div>Is reminder on &larr; <code>isReminderOn</code></div>'
+      +'<div>Reminder date time &larr; <code>reminderDateTime</code> (UTC)</div>'
+      +'<div>Due date time &larr; <code>dueDateTime</code> (UTC, date-only)</div>'
+      +'<div class="muted">In the Update branch: To-do task &larr; <code>first(body(\'Filter_array\'))?[\'id\']</code></div>';
+    b.appendChild(map);
+    b.appendChild(el('<div class="muted" style="font-size:13px">&#9888; Map each field with the <code>items(\'Apply_to_each\')?[&hellip;]</code> expression &mdash; <b>not</b> the "Body &hellip;" dynamic-content tokens (those read the existing To&nbsp;Do task and add a stray nested "For each").</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">Date-times are already UTC, so there\'s no time-zone field to set. A reminder is sent only when you turn on <b>Remind me</b> for a task. Notes keep their line breaks (sent as HTML). Get file content returns binary &mdash; that\'s why Parse JSON uses <code>base64ToString(&hellip;)</code> above.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">No duplicates: each item\'s <code>bodyContent</code> ends with <code>[taskhub:&lt;id&gt;]</code>. In the flow, <b>List to-do\'s by folder</b> + <b>Filter array</b> on that tag, then update the match or add a new one. Map <code>list</code> (Personal / Work) to a To&nbsp;Do list if you like.</div>'));
+    b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Parse JSON schema</div>'));
+    var sch=el('<textarea class="json" readonly style="height:150px" aria-label="Parse JSON schema"></textarea>'); sch.value=TODO_SCHEMA; b.appendChild(sch);
+    var row3=el('<div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap"></div>');
+    var dlF=el('<button class="btn">'+ic('download')+' Download feed sample</button>'); dlF.onclick=function(){ downloadText(JSON.stringify({todo:buildTodoFeed()},null,2), "taskhub-todo-feed.json"); };
+    var cpS=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Copy schema</button>'); cpS.onclick=function(){ sch.focus(); sch.select(); try{document.execCommand("copy");}catch(e){} if(navigator.clipboard)navigator.clipboard.writeText(sch.value).then(function(){toast("Schema copied");},function(){}); toast("Schema copied"); };
+    row3.appendChild(dlF); row3.appendChild(cpS); b.appendChild(row3);
+    b.appendChild(el('<div class="muted" style="font-size:12px">Full step-by-step + flow diagram: <code>TaskHub-PowerAutomate-CheatSheet.docx</code> and <code>TaskHub-PowerAutomate-Flow-Sketch.docx</code> (same folder as this file).</div>'));
+    b.appendChild(el('<div style="border-top:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; margin-top:8px; padding-top:12px; font-size:13px; font-weight:700">Other direction: pull Outlook events in</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">A second flow pulls your Outlook calendar into the <b>Upcoming Events</b> panel (Outlook &rarr; <code>taskhub-events.json</code> &rarr; TaskHub). Step-by-step: <code>TaskHub-PowerAutomate-Events.docx</code> in this folder.</div>'));
+    if(fsSupported){
+      var evRow=el('<div class="row" style="gap:8px; flex-wrap:wrap"></div>');
+      if(eventsHandle && !eventsNeedsReconnect){ evRow.appendChild(el('<span class="muted" style="font-size:13px">'+ic('check')+' Outlook events connected'+(eventsMeta&&eventsMeta.syncedAt?' &middot; synced '+esc(eventsMeta.syncedAt):'')+'</span>')); }
+      else { var ecn=el('<button class="btn">'+ic('bolt')+' Connect Outlook events</button>'); ecn.onclick=function(){ closeModal(); connectEventsFile(); }; evRow.appendChild(ecn); }
+      b.appendChild(evRow);
+    }
+  } else if(modal==="trash"){
+    var trash=trashedTasks().slice().sort(function(a,b){ return b.deletedAt-a.deletedAt; });
+    b.appendChild(el('<div class="muted" style="font-size:13px">Deleted tasks are kept here and auto-removed after 30 days. Restore to bring one back.</div>'));
+    if(!trash.length){ b.appendChild(el('<div class="empty">Recently deleted is empty.</div>')); }
+    else {
+      var topRow=el('<div class="row" style="justify-content:flex-end; gap:8px"></div>');
+      var ra=el('<button class="btn">'+ic('undo')+' Restore all</button>'); ra.onclick=function(){ restoreAllTrash(); };
+      var et=el('<button class="btn btn-danger">'+ic('trash')+' Empty trash</button>'); et.onclick=function(){ if(confirm("Permanently delete "+trash.length+" task"+(trash.length===1?"":"s")+"? This can't be undone via the file backup.")) emptyTrash(); };
+      topRow.appendChild(ra); topRow.appendChild(et); b.appendChild(topRow);
+      var listWrap=el('<div style="display:grid; gap:6px"></div>');
+      trash.forEach(function(t){
+        var row=el('<div class="ev" style="align-items:flex-start"></div>');
+        var when=new Date(t.deletedAt).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+        row.appendChild(el('<div style="flex:1; min-width:0"><div style="font-weight:500">'+esc(t.title)+'</div><div class="muted" style="font-size:12px">'+((THEME[t.list]&&THEME[t.list].label)||t.list)+' &middot; deleted '+esc(when)+'</div></div>'));
+        var rbtn=el('<button class="btn" style="padding:5px 10px">Restore</button>'); rbtn.onclick=function(){ restoreTask(t.id); };
+        var pbtn=el('<button class="iconbtn" title="Delete forever" aria-label="Delete forever: '+esc(t.title)+'" style="color:'+odC()+'">'+ic('trash')+'</button>'); pbtn.onclick=function(){ purgeTask(t.id); };
+        row.appendChild(rbtn); row.appendChild(pbtn);
+        listWrap.appendChild(row);
+      });
+      b.appendChild(listWrap);
+    }
+  } else if(modal==="ai"){
+    b.appendChild(el('<div class="muted" style="font-size:13px">Let a <b>Dust agent</b> add and adjust tasks from your meetings, docs and chats. The agent <b>reads</b> <code>taskhub-data.json</code> (current tasks + ids), then <b>writes</b> a change-set to <code>taskhub-inbox.json</code>. TaskHub ingests it on window focus (or <b>Check now</b>): <b>adds &amp; completes apply automatically</b>; edits, reschedules and deletes wait for your review.</div>'));
+    if(!fsSupported){ b.appendChild(el('<div class="warn">'+ic('alert')+' <span>This browser can\'t link local files, so the file inbox isn\'t available. You can still paste a change-set via <b>Import</b>.</span></div>')); }
+    else {
+      var cRow=el('<div class="row" style="gap:8px; flex-wrap:wrap"></div>');
+      if(inboxHandle && !inboxNeedsReconnect){
+        cRow.appendChild(el('<span class="muted" style="font-size:13px">'+ic('check')+' AI inbox connected'+(inboxLastBatch&&inboxLastBatch.generatedAt?(' &middot; last batch '+esc(inboxLastBatch.generatedAt)):'')+'</span>'));
+        var chk=el('<button class="btn" style="padding:5px 10px">'+ic('repeat')+' Check now</button>'); chk.onclick=function(){ readInbox(false); }; cRow.appendChild(chk);
+      } else if(inboxHandle && inboxNeedsReconnect){ var rc2=el('<button class="btn">'+ic('link')+' Reconnect AI inbox</button>'); rc2.onclick=function(){ readInbox(false); }; cRow.appendChild(rc2); }
+      else { var cn2=el('<button class="btn">'+ic('bolt')+' Connect AI inbox</button>'); cn2.onclick=function(){ closeModal(); connectInboxFile(); }; cRow.appendChild(cn2); }
+      b.appendChild(cRow);
+      if(inboxPending.length){ var rv=el('<button class="btn btn-primary" style="background:'+THEME.today.grad+'">'+ic('sparkles')+' Review '+inboxPending.length+' suggestion'+(inboxPending.length===1?"":"s")+'</button>'); rv.onclick=function(){ openModal("aiReview"); }; b.appendChild(rv); }
+    }
+    b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Set up the Dust agent</div>'));
+    var ol2=el('<ol style="font-size:14px; line-height:1.6; margin:0; padding-left:20px"></ol>');
+    ol2.innerHTML='<li>Give the agent <b>read</b> access to <code>taskhub-data.json</code> and <b>read+write</b> to <code>taskhub-inbox.json</code> (same OneDrive folder).</li>'
+      +'<li>Paste the <b>agent instructions</b> + <b>schema</b> (below) into the agent.</li>'
+      +'<li>In TaskHub, click <b>Connect AI inbox</b> and pick <code>taskhub-inbox.json</code> (it reconnects automatically afterward).</li>'
+      +'<li>Chat with the agent ("turn today\'s meeting notes into tasks"). It writes the inbox; TaskHub picks it up on focus or <b>Check now</b>.</li>';
+    b.appendChild(ol2);
+    b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Change-set schema</div>'));
+    var sc2=el('<textarea class="json" readonly style="height:150px" aria-label="Inbox schema"></textarea>'); sc2.value=INBOX_SCHEMA; b.appendChild(sc2);
+    var rowi=el('<div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap"></div>');
+    var dls=el('<button class="btn">'+ic('download')+' Download sample inbox</button>'); dls.onclick=function(){ downloadText(inboxSample(), "taskhub-inbox.json"); };
+    var cps=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Copy schema</button>'); cps.onclick=function(){ sc2.focus(); sc2.select(); try{document.execCommand("copy");}catch(e){} if(navigator.clipboard)navigator.clipboard.writeText(sc2.value).then(function(){toast("Schema copied");},function(){}); toast("Schema copied"); };
+    rowi.appendChild(dls); rowi.appendChild(cps); b.appendChild(rowi);
+    b.appendChild(el('<div class="muted" style="font-size:12px">Full setup + ready-to-paste agent instructions: <code>TaskHub-Dust-Agent.docx</code> (same folder as this file).</div>'));
+  } else if(modal==="aiReview"){
+    b.appendChild(el('<div class="muted" style="font-size:13px">These changes affect existing tasks, so they wait for your OK. (Adds &amp; completes were already applied automatically.) Anything you apply here goes through normal undo and Recently&nbsp;deleted.</div>'));
+    if(!inboxPending.length){ b.appendChild(el('<div class="empty">No AI suggestions to review.</div>')); }
+    else {
+      var topR=el('<div class="row" style="justify-content:flex-end; gap:8px"></div>');
+      var dall=el('<button class="btn btn-danger">'+ic('x')+' Discard all</button>'); dall.onclick=function(){ inboxResolveAll(false); };
+      var aall=el('<button class="btn btn-primary" style="background:'+THEME.today.grad+'">'+ic('check')+' Apply all</button>'); aall.onclick=function(){ inboxResolveAll(true); };
+      topR.appendChild(dall); topR.appendChild(aall); b.appendChild(topR);
+      var wrapL=el('<div style="display:grid; gap:8px"></div>');
+      inboxPending.forEach(function(op){
+        var t=inboxFindTarget(op.match);
+        var actLabel={update:"Update",reschedule:"Reschedule",delete:"Delete"}[op.action]||op.action;
+        var bits=[];
+        if(op.action==="delete"){ bits.push("Move to Recently deleted"); }
+        else { var p=inboxCoerce(op.set||{}); Object.keys(p).forEach(function(k){ var label={dueDate:"Due date",dueTime:"Time",priority:"Priority",list:"List",title:"Title",notes:"Notes"}[k]||k; var val=(k==="notes")?"…":(p[k]===null?"(none)":p[k]); bits.push(label+" → "+esc(""+val)); }); }
+        var c2=el('<div class="ev" style="align-items:flex-start; flex-direction:column; gap:6px"></div>');
+        c2.appendChild(el('<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap"><span class="pill" style="background:'+lS("today")+'; color:'+lA("today")+'">'+esc(actLabel)+'</span> <b style="font-size:15px">'+esc(t?t.title:((op.match&&op.match.title)||"(task not found)"))+'</b></div>'));
+        if(bits.length) c2.appendChild(el('<div style="font-size:13px">'+bits.join(' &middot; ')+'</div>'));
+        if(op.reason) c2.appendChild(el('<div class="muted" style="font-size:12px">Why: '+esc(op.reason)+'</div>'));
+        if(op.source) c2.appendChild(el('<div class="muted" style="font-size:12px">Source: '+esc(op.source)+'</div>'));
+        if(!t) c2.appendChild(el('<div style="font-size:12px; color:'+odC()+'">No matching task &mdash; applying will do nothing.</div>'));
+        var bR=el('<div class="row" style="gap:8px"></div>');
+        var apb=el('<button class="btn" style="padding:5px 10px">'+ic('check')+' Apply</button>'); apb.onclick=(function(o){return function(){ inboxResolve(o,true); };})(op);
+        var dsb=el('<button class="btn btn-danger" style="padding:5px 10px">Discard</button>'); dsb.onclick=(function(o){return function(){ inboxResolve(o,false); };})(op);
+        bR.appendChild(apb); bR.appendChild(dsb); c2.appendChild(bR);
+        wrapL.appendChild(c2);
+      });
+      b.appendChild(wrapL);
+    }
+  } else {
+    b.appendChild(el('<div class="muted" style="font-size:13px">Paste backup JSON or choose a .json file. This <b>replaces</b> all current data.</div>'));
+    var fileInp=el('<input type="file" accept="application/json,.json" aria-label="Choose backup file" />'); fileInp.onchange=function(){ var f=fileInp.files[0]; if(!f)return; var rd=new FileReader(); rd.onload=function(){ if(doImport(rd.result,false)){ closeModal(); } }; rd.readAsText(f); }; b.appendChild(fileInp);
+    var ta2=el('<textarea class="json" placeholder=\'{"tasks":[...],"sections":[...]}\'></textarea>'); ta2.value=importBuf; ta2.oninput=function(){ importBuf=ta2.value; }; b.appendChild(ta2);
+    var row2=el('<div class="row" style="justify-content:flex-end; gap:8px"></div>');
+    var cancel=el('<button class="btn">Cancel</button>'); cancel.onclick=closeModal;
+    var imp=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Import &amp; Replace</button>'); imp.onclick=function(){ if(doImport(ta2.value,false)){ closeModal(); } };
+    row2.appendChild(cancel); row2.appendChild(imp); b.appendChild(row2);
+  }
+  m.appendChild(b); bg.appendChild(m); return bg;
+}
+
+// ---------------- modal open/close + focus management ----------------
+function openModal(which){ lastFocused=document.activeElement; modal=which; if(which==="import")importBuf=""; render(); }
+function closeModal(){ modal=null; render(); if(lastFocused && typeof lastFocused.focus==="function"){ try{ lastFocused.focus(); }catch(e){} } lastFocused=null; }
+function trapTab(e){
+  var mod=document.querySelector(".modal"); if(!mod)return;
+  var f=mod.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])');
+  if(!f.length)return;
+  var first=f[0], last=f[f.length-1];
+  if(e.shiftKey){ if(document.activeElement===first || !mod.contains(document.activeElement)){ e.preventDefault(); last.focus(); } }
+  else { if(document.activeElement===last){ e.preventDefault(); first.focus(); } }
+}
+
+// close calendar menu / inline editors when clicking outside them
+document.addEventListener("click", function(e){
+  var changed=false;
+  if(menuOpen && !e.target.closest(".menu") && !e.target.closest("[data-calbtn]")){ menuOpen=null; changed=true; }
+  if(popover && !e.target.closest(".editpop") && !e.target.closest("[data-metachip]")){ popover=null; changed=true; }
+  if(changed) render();
+  // close the mobile "More" toolbar menu on outside click (no re-render needed)
+  var moreOpen=document.querySelector(".tb-more.open");
+  if(moreOpen && !e.target.closest(".tb-more") && !e.target.closest(".tb-more-btn")){ moreOpen.classList.remove("open"); var mb=document.querySelector(".tb-more-btn"); if(mb) mb.setAttribute("aria-expanded","false"); }
+});
+
+// ---------------- keyboard shortcuts ----------------
+document.addEventListener("keydown", function(e){
+  if(e.key==="Escape"){
+    if(modal){ closeModal(); return; }
+    if(popover){ popover=null; render(); return; }
+    if(menuOpen!==null){ menuOpen=null; render(); return; }
+    if(selectMode){ selectMode=false; selected={}; render(); return; }
+  }
+  if(modal){ if(e.key==="Tab") trapTab(e); return; }
+  var inField = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
+  if((e.ctrlKey||e.metaKey) && (e.key==="z"||e.key==="Z") && e.shiftKey){ if(!inField){ e.preventDefault(); doRedo(); } return; }
+  if((e.ctrlKey||e.metaKey) && (e.key==="y"||e.key==="Y")){ if(!inField){ e.preventDefault(); doRedo(); } return; }
+  if((e.ctrlKey||e.metaKey) && (e.key==="z"||e.key==="Z")){ if(!inField){ e.preventDefault(); doUndo(); } return; }
+  if((e.ctrlKey||e.metaKey) && (e.key==="a"||e.key==="A")){ if(selectMode && !inField){ e.preventDefault(); var ids=visibleOrderedIds(); ids.forEach(function(i){ selected[i]=true; }); if(ids.length)selAnchor=ids[ids.length-1]; render(); } return; }
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(inField) return;
+  if(e.key==="/"){ var s=document.getElementById("searchInput"); if(s){ e.preventDefault(); s.focus(); } return; }
+  if(e.key==="n"||e.key==="N"){ var a=document.getElementById("addInput"); if(a){ e.preventDefault(); a.focus(); } return; }
+  if(e.key==="?"){ toast("Shortcuts: / search · n new task · 1-4 tabs · Esc close · Ctrl+Z undo · Ctrl+Y redo · in Select: Ctrl+A all, Shift-click range"); return; }
+  if(e.key>="1" && e.key<="4"){ var map={"1":"today","2":"combined","3":"work","4":"personal"}; view=map[e.key]; render(); return; }
+});
+
+purgeOldTrash();
+archiveOldDone();
+loadPrefs();
+applyTheme();
+render();
+restoreDataHandle();
+restoreEventsHandle();
+restoreInboxHandle();
+window.addEventListener("focus", function(){
+  // don't rebuild the view (and lose uncommitted edits / caret / scroll) while a dialog is open or a field is focused; next idle focus picks it up
+  if(modal) return;
+  var ae=document.activeElement;
+  if(ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable)) return;
+  if(eventsHandle && !eventsNeedsReconnect) readEvents(true);
+  if(inboxHandle && !inboxNeedsReconnect) readInbox(true);
+});
+</script>
+</body>
+</html>
