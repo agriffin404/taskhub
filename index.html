@@ -804,7 +804,7 @@ function toggleTheme(){ darkMode=!darkMode; try{ localStorage.setItem(THEME_KEY,
 
 // remember view / filters / sort across sessions
 var PREFS_KEY = "taskhub-prefs-v1";
-function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact, evOpen:evOpen })); }catch(e){} }
 function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}");
   if(["today","combined","work","personal"].indexOf(p.view)>=0) view=p.view;
   if(["all","active","completed"].indexOf(p.filter)>=0) filter=p.filter;
@@ -813,6 +813,7 @@ function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}
   if(p.sortDir==="asc"||p.sortDir==="desc") sortDir=p.sortDir;
   if(["date","priority","list","none"].indexOf(p.groupBy)>=0) groupBy=p.groupBy;
   if(typeof p.compact==="boolean") compact=p.compact;
+  if(typeof p.evOpen==="boolean") evOpen=p.evOpen;
 }catch(e){} }
 
 function toast(m, action){ toastMsg=m; toastAction=action||null; if(toastTimer)clearTimeout(toastTimer); render(); var dur=action?7000:3500; toastTimer=setTimeout(function(){toastMsg=null;toastAction=null;render();},dur); }
@@ -1412,7 +1413,7 @@ var SHOWAS={ busy:{l:"Busy",c:"#4338ca",b:"#eef2ff",cD:"#a5b4fc",bD:"#262445"}, 
 function showAs(key){ var s=SHOWAS[key]||SHOWAS.busy; return { l:s.l, c:darkMode?s.cD:s.c, b:darkMode?s.bD:s.b }; }
 function clockMin(s){ if(!s)return 9999; var m=s.match(/(\d+):(\d+)\s*(AM|PM)/i); if(!m)return 9999; var h=parseInt(m[1],10)%12; if(m[3].toUpperCase()==="PM")h+=12; return h*60+parseInt(m[2],10); }
 function evDayLabel(ds){ var p=ds.split("-").map(Number); var dt=new Date(p[0],p[1]-1,p[2]); var t0=new Date(); t0.setHours(0,0,0,0); var diff=Math.round((dt-t0)/86400000); if(diff===0)return "Today"; if(diff===1)return "Tomorrow"; return dt.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"}); }
-var evOpen=false, hideDeclined=true;
+var evOpen=true, hideDeclined=true;   // Upcoming Events panel starts expanded (persisted in prefs)
 function renderEvents(){
   var card=el('<div class="card" style="margin-top:16px; overflow:hidden"></div>');
   var all=eventsList();
