@@ -239,7 +239,7 @@
 // ---------------- constants ----------------
 var STORAGE_KEY = "taskhub-html-v1";
 var SCHEMA_VERSION = 2;
-var EVENT_DESC_DEFAULT = "Created from Dust (TaskHub)";
+var EVENT_DESC_DEFAULT = "Created in TaskHub";
 // NOTE: events are loaded live from the linked taskhub-events.json. The baked snapshot is
 // intentionally empty so this file is safe to host publicly (no calendar data inside it).
 var EVENTS_SYNCED_AT = "";
@@ -384,7 +384,7 @@ function utc(dt){ return dt.getUTCFullYear()+pad(dt.getUTCMonth()+1)+pad(dt.getU
 function icsLocal(dt){ return dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate())+"T"+pad(dt.getHours())+pad(dt.getMinutes())+pad(dt.getSeconds()); }
 function dOnly(s){ return s.replace(/-/g,""); }
 function escICS(s){ return (s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n"); }
-function buildICS(t,mode){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Dust//TaskHub//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:"+t.id+"@dust-taskhub","DTSTAMP:"+utc(new Date()),"SUMMARY:"+escICS(t.title),"DESCRIPTION:"+escICS(desc)]; if(mode==="block"&&t.dueDate){ var s=buildDate(t.dueDate,t.dueTime); var e=new Date(s.getTime()+3600000); L.push("DTSTART:"+icsLocal(s)); L.push("DTEND:"+icsLocal(e)); } else if(t.dueDate){ L.push("DTSTART;VALUE=DATE:"+dOnly(t.dueDate)); L.push("DTEND;VALUE=DATE:"+dOnly(addDays(t.dueDate,1))); L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+escICS(t.title),"TRIGGER:-PT9H","END:VALARM"); } L.push("END:VEVENT","END:VCALENDAR"); return L.join("\r\n"); }
+function buildICS(t,mode){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//TaskHub//EN","CALSCALE:GREGORIAN","BEGIN:VEVENT","UID:"+t.id+"@taskhub","DTSTAMP:"+utc(new Date()),"SUMMARY:"+escICS(t.title),"DESCRIPTION:"+escICS(desc)]; if(mode==="block"&&t.dueDate){ var s=buildDate(t.dueDate,t.dueTime); var e=new Date(s.getTime()+3600000); L.push("DTSTART:"+icsLocal(s)); L.push("DTEND:"+icsLocal(e)); } else if(t.dueDate){ L.push("DTSTART;VALUE=DATE:"+dOnly(t.dueDate)); L.push("DTEND;VALUE=DATE:"+dOnly(addDays(t.dueDate,1))); L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+escICS(t.title),"TRIGGER:-PT9H","END:VALARM"); } L.push("END:VEVENT","END:VCALENDAR"); return L.join("\r\n"); }
 function downloadText(content, filename){ var blob=new Blob([content],{type:"text/plain"}); var url=URL.createObjectURL(blob); var a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(url);},1000); }
 function gcalUrl(t){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var p=["text="+encodeURIComponent(t.title),"details="+encodeURIComponent(desc)]; if(t.dueDate){ if(t.dueTime){ var s=buildDate(t.dueDate,t.dueTime); var e=new Date(s.getTime()+3600000); p.push("dates="+utc(s)+"/"+utc(e)); } else { p.push("dates="+dOnly(t.dueDate)+"/"+dOnly(addDays(t.dueDate,1))); } } return "https://calendar.google.com/calendar/render?action=TEMPLATE&"+p.join("&"); }
 function outlookUrl(t){ var desc=notesToPlain((t.notes||"").trim())||EVENT_DESC_DEFAULT; var p=["subject="+encodeURIComponent(t.title),"body="+encodeURIComponent(desc)]; if(t.dueDate){ var s=buildDate(t.dueDate,t.dueTime); if(t.dueTime){ var e=new Date(s.getTime()+3600000); p.push("startdt="+encodeURIComponent(s.toISOString())); p.push("enddt="+encodeURIComponent(e.toISOString())); } else { p.push("startdt="+t.dueDate); p.push("enddt="+addDays(t.dueDate,1)); p.push("allday=true"); } } return "https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&"+p.join("&"); }
@@ -561,7 +561,7 @@ function eventsList(){ return liveEvents || EVENTS_SNAPSHOT; }
 function evSyncedAt(){ return (eventsMeta && eventsMeta.syncedAt) || EVENTS_SYNCED_AT; }
 function evRangeLabel(){ return (eventsMeta && eventsMeta.rangeLabel) || EVENTS_RANGE_LABEL; }
 
-// ---------------- AI inbox (a Dust agent writes a change-set; we ingest & merge) ----------------
+// ---------------- AI inbox (an AI agent writes a change-set; we ingest & merge) ----------------
 // The agent READS taskhub-data.json (current tasks + ids) and WRITES taskhub-inbox.json (ops).
 // Safe ops (add/complete/uncomplete) auto-apply; risky ops (update/reschedule/delete) queue for review.
 var inboxHandle = null;          // FileSystemFileHandle for taskhub-inbox.json (read)
@@ -976,7 +976,7 @@ function render(){
   var moreBtn=el('<button class="btn tb-more-btn" aria-haspopup="true" aria-expanded="false" aria-label="More actions">'+ic('chevdown')+' More</button>'); moreBtn.onclick=function(e){ e.stopPropagation(); var pnl=tb.querySelector('.tb-more'); if(pnl){ var op=pnl.classList.toggle('open'); moreBtn.setAttribute('aria-expanded', String(op)); } }; tb.appendChild(moreBtn);
   // primary trailing
   var aiN=inboxPending.length;
-  var ai=el('<button class="btn"'+(aiN?' style="background:'+lS("today")+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'; color:'+lA("today")+'"':'')+' title="AI assistant (Dust)">'+ic('sparkles')+'<span class="hide-sm"> AI</span>'+(aiN?' <span class="pill" style="background:'+lA("today")+'; color:#fff">'+aiN+'</span>':'')+'</button>'); ai.onclick=function(){ if(inboxPending.length) openModal("aiReview"); else openModal("ai"); }; tb.appendChild(ai);
+  var ai=el('<button class="btn"'+(aiN?' style="background:'+lS("today")+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'; color:'+lA("today")+'"':'')+' title="AI assistant">'+ic('sparkles')+'<span class="hide-sm"> AI</span>'+(aiN?' <span class="pill" style="background:'+lA("today")+'; color:#fff">'+aiN+'</span>':'')+'</button>'); ai.onclick=function(){ if(inboxPending.length) openModal("aiReview"); else openModal("ai"); }; tb.appendChild(ai);
   var dk=el('<button class="btn" aria-label="'+(darkMode?"Switch to light mode":"Switch to dark mode")+'" title="Toggle dark mode">'+(darkMode?ic('sun'):ic('moon'))+'<span class="hide-sm">'+(darkMode?"Light":"Dark")+'</span></button>'); dk.onclick=toggleTheme; tb.appendChild(dk);
   app.appendChild(tb);
   if(selectMode){ app.appendChild(renderBulkBar()); }
@@ -997,7 +997,7 @@ function render(){
   }
   // (the "Auto-saving" confirmation now lives compactly in the toolbar's "All linked" button)
 
-  // AI suggestions awaiting review (risky ops the Dust agent proposed)
+  // AI suggestions awaiting review (risky ops the AI agent proposed)
   if(inboxPending.length){
     var aiw=el('<div class="warn" style="background:'+lS("today")+'; border-color:'+(darkMode?"#5a3a12":"#fed7aa")+'; color:'+lA("today")+'; align-items:center"><span>'+ic('sparkles')+' <b>'+inboxPending.length+' AI suggestion'+(inboxPending.length===1?"":"s")+'</b> to review (edits / reschedules / deletes).</span></div>');
     var aibtn=el('<button class="btn" style="margin-left:auto">Review</button>'); aibtn.onclick=function(){ openModal("aiReview"); }; aiw.appendChild(aibtn);
@@ -1436,7 +1436,7 @@ function renderEvents(){
       else { var cn=el('<button class="btn" style="padding:5px 10px">'+ic('bolt')+' Connect Outlook sync</button>'); cn.onclick=function(e){ e.stopPropagation(); connectEventsFile(); }; sync.appendChild(cn); }
     }
     body.appendChild(sync);
-    if(!liveEvents && fsSupported && !eventsHandle){ body.appendChild(el('<div class="muted" style="font-size:12px; margin-bottom:8px">Set up a Power Automate flow to write <code>taskhub-events.json</code> from Outlook, then <b>Connect Outlook sync</b> to point at it (reconnects automatically after). See <code>TaskHub-PowerAutomate-Events.docx</code> in this folder. Or keep asking the Dust agent to refresh.</div>')); }
+    if(!liveEvents && fsSupported && !eventsHandle){ body.appendChild(el('<div class="muted" style="font-size:12px; margin-bottom:8px">Set up a Power Automate flow to write <code>taskhub-events.json</code> from Outlook, then <b>Connect Outlook sync</b> to point at it (reconnects automatically after). See the <code>TaskHub-PowerAutomate-Events.docx</code> guide in your TaskHub setup folder.</div>')); }
     var declinedCount=all.filter(function(e){return e.title.indexOf("Declined:")===0;}).length;
     if(declinedCount>0){ var dtog=el('<button class="btn" style="margin-bottom:10px" aria-pressed="'+(!hideDeclined)+'">'+(hideDeclined?("Show "+declinedCount+" declined"):"Hide declined")+'</button>'); dtog.onclick=function(e){ e.stopPropagation(); hideDeclined=!hideDeclined; render(); }; body.appendChild(dtog); }
     var byDay={}; var order=[];
@@ -1515,12 +1515,12 @@ function renderModal(){
   var bg=el('<div class="modal-bg"></div>'); bg.onclick=function(e){ if(e.target===bg){ closeModal(); } };
   var m=el('<div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>');
   var mh=el('<div class="modal-h"></div>');
-  mh.appendChild(el('<b id="modalTitle">'+(modal==="export"?"Export backup":modal==="automate"?"Sync to Microsoft To Do":modal==="trash"?"Recently deleted":modal==="ai"?"AI assistant (Dust)":modal==="aiReview"?"Review AI suggestions":"Import backup")+'</b>'));
+  mh.appendChild(el('<b id="modalTitle">'+(modal==="export"?"Export backup":modal==="automate"?"Sync to Microsoft To Do":modal==="trash"?"Recently deleted":modal==="ai"?"AI assistant":modal==="aiReview"?"Review AI suggestions":"Import backup")+'</b>'));
   var xb=el('<button class="iconbtn" aria-label="Close dialog">'+ic('x')+'</button>'); xb.onclick=closeModal; mh.appendChild(xb);
   m.appendChild(mh);
   var b=el('<div class="modal-b"></div>');
   if(modal==="export"){
-    b.appendChild(el('<div class="muted" style="font-size:13px">Copy this JSON and paste it to the Dust agent for a saved backup &mdash; or download it.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">Copy this JSON and paste it to your AI agent for a saved backup &mdash; or download it.</div>'));
     var ta=el('<textarea class="json" readonly></textarea>'); ta.value=exportJson(); b.appendChild(ta);
     var row=el('<div class="row" style="justify-content:flex-end; gap:8px"></div>');
     var dl=el('<button class="btn">'+ic('download')+' Download .json</button>'); dl.onclick=function(){ var d=new Date(); downloadText(exportJson(), "taskhub-backup-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+".json"); };
@@ -1551,13 +1551,15 @@ function renderModal(){
     b.appendChild(el('<div class="muted" style="font-size:13px">&#9888; Map each field with the <code>items(\'Apply_to_each\')?[&hellip;]</code> expression &mdash; <b>not</b> the "Body &hellip;" dynamic-content tokens (those read the existing To&nbsp;Do task and add a stray nested "For each").</div>'));
     b.appendChild(el('<div class="muted" style="font-size:13px">Date-times are already UTC, so there\'s no time-zone field to set. A reminder is sent only when you turn on <b>Remind me</b> for a task. Notes keep their line breaks (sent as HTML). Get file content returns binary &mdash; that\'s why Parse JSON uses <code>base64ToString(&hellip;)</code> above.</div>'));
     b.appendChild(el('<div class="muted" style="font-size:13px">No duplicates: each item\'s <code>bodyContent</code> ends with <code>[taskhub:&lt;id&gt;]</code>. In the flow, <b>List to-do\'s by folder</b> + <b>Filter array</b> on that tag, then update the match or add a new one. Map <code>list</code> (Personal / Work) to a To&nbsp;Do list if you like.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px"><b>Deletes sync too:</b> removing a task in TaskHub also removes it from To&nbsp;Do &mdash; the flow\'s Delete loop reads the exported <code>deletedIds</code>. Set the trigger\'s <b>Concurrency Control</b> to <b>1</b> so overlapping runs can\'t create duplicate adds.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px"><b>Completions live in TaskHub.</b> You check tasks off here (the single source of truth); To&nbsp;Do is for capture, reminders and viewing. Completing a task in To&nbsp;Do is <b>not</b> synced back.</div>'));
     b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Parse JSON schema</div>'));
     var sch=el('<textarea class="json" readonly style="height:150px" aria-label="Parse JSON schema"></textarea>'); sch.value=TODO_SCHEMA; b.appendChild(sch);
     var row3=el('<div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap"></div>');
     var dlF=el('<button class="btn">'+ic('download')+' Download feed sample</button>'); dlF.onclick=function(){ downloadText(JSON.stringify({todo:buildTodoFeed()},null,2), "taskhub-todo-feed.json"); };
     var cpS=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Copy schema</button>'); cpS.onclick=function(){ sch.focus(); sch.select(); try{document.execCommand("copy");}catch(e){} if(navigator.clipboard)navigator.clipboard.writeText(sch.value).then(function(){toast("Schema copied");},function(){}); toast("Schema copied"); };
     row3.appendChild(dlF); row3.appendChild(cpS); b.appendChild(row3);
-    b.appendChild(el('<div class="muted" style="font-size:12px">Full step-by-step + flow diagram: <code>TaskHub-PowerAutomate-CheatSheet.docx</code> and <code>TaskHub-PowerAutomate-Flow-Sketch.docx</code> (same folder as this file).</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:12px">Full step-by-step + flow diagram: see the <code>TaskHub-PowerAutomate-CheatSheet.docx</code> and <code>TaskHub-PowerAutomate-Flow-Sketch.docx</code> guides in your TaskHub setup folder.</div>'));
     b.appendChild(el('<div style="border-top:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; margin-top:8px; padding-top:12px; font-size:13px; font-weight:700">Other direction: pull Outlook events in</div>'));
     b.appendChild(el('<div class="muted" style="font-size:13px">A second flow pulls your Outlook calendar into the <b>Upcoming Events</b> panel (Outlook &rarr; <code>taskhub-events.json</code> &rarr; TaskHub). Step-by-step: <code>TaskHub-PowerAutomate-Events.docx</code> in this folder.</div>'));
     if(fsSupported){
@@ -1588,7 +1590,8 @@ function renderModal(){
       b.appendChild(listWrap);
     }
   } else if(modal==="ai"){
-    b.appendChild(el('<div class="muted" style="font-size:13px">Let a <b>Dust agent</b> add and adjust tasks from your meetings, docs and chats. The agent <b>reads</b> <code>taskhub-data.json</code> (current tasks + ids), then <b>writes</b> a change-set to <code>taskhub-inbox.json</code>. TaskHub ingests it on window focus (or <b>Check now</b>): <b>adds &amp; completes apply automatically</b>; edits, reschedules and deletes wait for your review.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">Let an <b>AI agent</b> add and adjust tasks from your meetings, docs and chats. The agent <b>reads</b> <code>taskhub-data.json</code> (current tasks + ids), then <b>writes</b> a change-set to <code>taskhub-inbox.json</code>. TaskHub ingests it on window focus (or <b>Check now</b>): <b>adds &amp; completes apply automatically</b>; edits, reschedules and deletes wait for your review.</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:13px">Self-healing: if the agent completes or edits a task that hasn\'t synced into TaskHub yet, it <b>retries on the next check</b> instead of being skipped &mdash; so "add a task and mark it done" lands on its own once it syncs.</div>'));
     if(!fsSupported){ b.appendChild(el('<div class="warn">'+ic('alert')+' <span>This browser can\'t link local files, so the file inbox isn\'t available. You can still paste a change-set via <b>Import</b>.</span></div>')); }
     else {
       var cRow=el('<div class="row" style="gap:8px; flex-wrap:wrap"></div>');
@@ -1600,7 +1603,7 @@ function renderModal(){
       b.appendChild(cRow);
       if(inboxPending.length){ var rv=el('<button class="btn btn-primary" style="background:'+THEME.today.grad+'">'+ic('sparkles')+' Review '+inboxPending.length+' suggestion'+(inboxPending.length===1?"":"s")+'</button>'); rv.onclick=function(){ openModal("aiReview"); }; b.appendChild(rv); }
     }
-    b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Set up the Dust agent</div>'));
+    b.appendChild(el('<div style="font-size:13px; font-weight:700; margin-top:4px">Set up the AI agent</div>'));
     var ol2=el('<ol style="font-size:14px; line-height:1.6; margin:0; padding-left:20px"></ol>');
     ol2.innerHTML='<li>Give the agent <b>read</b> access to <code>taskhub-data.json</code> and <b>read+write</b> to <code>taskhub-inbox.json</code> (same OneDrive folder).</li>'
       +'<li>Paste the <b>agent instructions</b> + <b>schema</b> (below) into the agent.</li>'
@@ -1613,7 +1616,7 @@ function renderModal(){
     var dls=el('<button class="btn">'+ic('download')+' Download sample inbox</button>'); dls.onclick=function(){ downloadText(inboxSample(), "taskhub-inbox.json"); };
     var cps=el('<button class="btn btn-primary" style="background:'+THEME.combined.grad+'">Copy schema</button>'); cps.onclick=function(){ sc2.focus(); sc2.select(); try{document.execCommand("copy");}catch(e){} if(navigator.clipboard)navigator.clipboard.writeText(sc2.value).then(function(){toast("Schema copied");},function(){}); toast("Schema copied"); };
     rowi.appendChild(dls); rowi.appendChild(cps); b.appendChild(rowi);
-    b.appendChild(el('<div class="muted" style="font-size:12px">Full setup + ready-to-paste agent instructions: <code>TaskHub-Dust-Agent.docx</code> (same folder as this file).</div>'));
+    b.appendChild(el('<div class="muted" style="font-size:12px">Full setup + ready-to-paste agent instructions: see the <code>TaskHub-AI-Agent.docx</code> guide in your TaskHub setup folder.</div>'));
   } else if(modal==="aiReview"){
     b.appendChild(el('<div class="muted" style="font-size:13px">These changes affect existing tasks, so they wait for your OK. (Adds &amp; completes were already applied automatically.) Anything you apply here goes through normal undo and Recently&nbsp;deleted.</div>'));
     if(!inboxPending.length){ b.appendChild(el('<div class="empty">No AI suggestions to review.</div>')); }
