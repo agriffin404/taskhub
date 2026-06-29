@@ -1061,7 +1061,7 @@ function renderAddBox(th){
   var qTom=el('<button class="chip" type="button" aria-pressed="false">Tomorrow</button>');
   // reminder toggle + time (time only shows when "Remind me" is on, and only with a date)
   var remChip=el('<button class="chip" type="button" aria-pressed="'+draftRemind+'">'+ic('bell')+' Remind me</button>');
-  var timeSel=timeSelect(draftTime||"09:00", false, function(v){ draftTime=v||""; });
+  var timeSel=timeSelect(draftTime||"09:00", false, function(v){ if(v){ draftTime=v; } else { draftRemind=false; draftTime=""; syncDate(); } });
   function syncDate(){
     draftDate=dateInp.value;
     var hasD=!!draftDate;
@@ -1232,7 +1232,7 @@ function buildDuePop(t){
     var rem=el('<button type="button" class="chip" aria-pressed="'+on+'" style="'+(on?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>');
     rem.onclick=function(){ updateTask(t.id,{dueTime: on?null:"09:00"}); };
     pop.appendChild(rem);
-    if(on){ var tm=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||"09:00"}); }); pop.appendChild(tm); }
+    if(on){ var tm=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||null}); }); pop.appendChild(tm); }
   }
   return pop;
 }
@@ -1382,7 +1382,7 @@ function renderTask(t){
     var remBtn=el('<button type="button" class="chip" aria-pressed="'+remOn+'"'+(t.dueDate?"":" disabled")+' style="'+(remOn?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>'); remBtn.onclick=function(){ if(t.dueDate) updateTask(t.id,{dueTime: remOn?null:"09:00"}); };
     g2.appendChild(el('<label class="lbl">Due date</label>')); g2.appendChild(el('<label class="lbl">Reminder</label>'));
     g2.appendChild(dd); g2.appendChild(remBtn); d.appendChild(g2);
-    if(remOn){ var dt2=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||"09:00"}); }); var rrow=el('<div class="row" style="gap:8px; align-items:center"></div>'); rrow.appendChild(el('<label class="lbl">Remind at</label>')); rrow.appendChild(dt2); d.appendChild(rrow); }
+    if(remOn){ var dt2=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||null}); }); var rrow=el('<div class="row" style="gap:8px; align-items:center"></div>'); rrow.appendChild(el('<label class="lbl">Remind at</label>')); rrow.appendChild(dt2); d.appendChild(rrow); }
     var pr=el('<div class="row" style="gap:6px"></div>');
     pr.setAttribute("role","group"); pr.setAttribute("aria-label","Priority");
     ["high","medium","low"].forEach(function(p){ var meta2=PRIO[p]; var active=t.priority===p; var b=el('<button class="chip" aria-pressed="'+active+'" aria-label="Priority '+meta2.label+'" style="'+(active?"background:"+pBg(p)+"; color:"+pT(p)+"; border-color:"+pBd(p):"")+'"><span aria-hidden="true" style="width:8px;height:8px;border-radius:9999px;background:'+meta2.dot+';display:inline-block"></span>'+meta2.label+'</button>'); b.onclick=function(){ updateTask(t.id,{priority:p}); }; pr.appendChild(b); });
