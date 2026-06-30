@@ -292,6 +292,7 @@ function noteHasLink(text){ return !!text && (/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/
 function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
 // inline emphasis applied to ALREADY-ESCAPED text: **bold**, __underline__, *italic*
 function mdEmph(s){ return s
+  .replace(/\*{3,}/g, "**")                              // collapse accidental triple/quad asterisks (double-applied bold)
   .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
   .replace(/__([^_\n]+)__/g, "<u>$1</u>")
   .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>"); }
@@ -327,6 +328,7 @@ function renderNotesHTML(raw){
 }
 function notesToPlain(raw){ return (raw==null?"":(""+raw))   // for plain-text targets (calendar): drop markers, keep readable list prefixes
   .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_,label,url){ return label+" ("+url+")"; })
+  .replace(/\*{3,}/g, "**")
   .replace(/\*\*([^*\n]+)\*\*/g, "$1")
   .replace(/__([^_\n]+)__/g, "$1")
   .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2"); }
@@ -343,9 +345,16 @@ function insertLinkAtCursor(ta, after){   // inserts [text](https://) at the car
 function fmtWrap(ta, mark, placeholder, after){
   try{ ta.focus(); }catch(e){}
   var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
-  var v=ta.value, had=v.slice(s,e), sel=had||placeholder;
-  ta.value=v.slice(0,s)+mark+sel+mark+v.slice(e);
-  ta.setSelectionRange(s+mark.length, s+mark.length+sel.length);   // keep the inner text selected
+  var v=ta.value, had=v.slice(s,e), ml=mark.length;
+  if(had.length>=2*ml && had.slice(0,ml)===mark && had.slice(had.length-ml)===mark){       // selection already wrapped -> toggle off
+    var inner=had.slice(ml, had.length-ml);
+    ta.value=v.slice(0,s)+inner+v.slice(e); ta.setSelectionRange(s, s+inner.length);
+  } else if(v.slice(s-ml,s)===mark && v.slice(e,e+ml)===mark){                              // markers just outside selection -> toggle off
+    ta.value=v.slice(0,s-ml)+had+v.slice(e+ml); ta.setSelectionRange(s-ml, s-ml+had.length);
+  } else {                                                                                  // wrap
+    var sel=had||placeholder;
+    ta.value=v.slice(0,s)+mark+sel+mark+v.slice(e); ta.setSelectionRange(s+ml, s+ml+sel.length);
+  }
   if(after) after(ta.value);
 }
 // turn the selected line(s) into a bulleted or numbered list (re-numbers; toggles existing markers)
@@ -1308,7 +1317,10 @@ function buildNotePop(t){
   var ta=el('<textarea class="field" rows="10" aria-label="Note" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; min-height:220px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
   pop.appendChild(notesToolbar(ta));
   pop.appendChild(ta);
-  if(noteHasFmt(t.notes)){ var npv=el('<div class="note-preview"></div>'); npv.innerHTML=renderNotesHTML(t.notes); pop.appendChild(npv); }
+  var npv=el('<div class="note-preview"></div>');
+  function refreshPv(val){ var has=!!(val&&val.trim()); npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val); }
+  refreshPv(t.notes||""); ta.oninput=function(){ refreshPv(ta.value); };   // live preview as you type
+  pop.appendChild(npv);
   return pop;
 }
 function buildListPop(t){
@@ -1457,7 +1469,10 @@ function renderTask(t){
     var nHead=el('<div class="row" style="gap:8px; align-items:center"></div>'); nHead.appendChild(el('<label class="lbl" style="margin-right:auto">Notes</label>'));
     nHead.appendChild(notesToolbar(ta));
     d.appendChild(nHead); d.appendChild(ta);
-    if(noteHasFmt(t.notes)){ d.appendChild(el('<div class="lbl" style="margin-top:2px">Preview</div>')); var npv=el('<div class="note-preview"></div>'); npv.innerHTML=renderNotesHTML(t.notes); d.appendChild(npv); }
+    var pvLabel=el('<div class="lbl" style="margin-top:2px">Preview</div>'), npv=el('<div class="note-preview"></div>');
+    function refreshPv(val){ var has=!!(val&&val.trim()); pvLabel.style.display=has?"":"none"; npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val); }
+    refreshPv(t.notes||""); ta.oninput=function(){ refreshPv(ta.value); };   // live preview as you type (saves on blur)
+    d.appendChild(pvLabel); d.appendChild(npv);
     // task ID (for reference / matching the [taskhub:id] tag in Microsoft To Do) — click to copy
     var idRow=el('<div class="muted" style="font-size:12px; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">Task ID: <code style="font-family:Consolas,monospace; background:'+(darkMode?"#1c1b19":"#f1f5f9")+'; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; padding:1px 6px; border-radius:6px">'+esc(t.id)+'</code></div>');
     var copyId=el('<button type="button" class="btn" style="padding:3px 8px; font-size:12px" title="Copy task ID">'+ic('checksq')+' Copy</button>');
