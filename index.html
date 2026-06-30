@@ -288,20 +288,48 @@ function dowDate(target,allowToday){ var d=new Date(); var dow=d.getDay(); var a
 function esc(s){ return (s==null?"":""+s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 // ---------- notes: hyperlinks (Markdown [label](url) + bare URLs) ----------
 function noteHasLink(text){ return !!text && (/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/.test(text) || /https?:\/\/\S/.test(text)); }
-function linkifyNotes(raw){   // -> safe HTML with clickable links and <br> line breaks
-  raw=(raw==null?"":(""+raw)).replace(/\r\n?/g,"\n");
+// does the note carry any rich formatting worth rendering (links, **bold**, __underline__, *italic*, list, newline)?
+function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
+// inline emphasis applied to ALREADY-ESCAPED text: **bold**, __underline__, *italic*
+function mdEmph(s){ return s
+  .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+  .replace(/__([^_\n]+)__/g, "<u>$1</u>")
+  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>"); }
+// render ONE line (links + bare URLs + inline emphasis); everything escaped, no <br>/lists
+function inlineRender(raw){
+  raw=(raw==null?"":(""+raw));
   var tokens=[], m;
-  var re1=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;                     // [label](url)
+  var re1=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
   while((m=re1.exec(raw))){ tokens.push({start:m.index,end:m.index+m[0].length,label:m[1],url:m[2]}); }
-  var re2=/https?:\/\/[^\s<>()]+/g;                                    // bare url not already inside a [..](..)
+  var re2=/https?:\/\/[^\s<>()]+/g;
   while((m=re2.exec(raw))){ var bs=m.index,be=bs+m[0].length; if(tokens.some(function(t){return bs<t.end&&be>t.start;}))continue; var url=m[0].replace(/[.,;:!?'"\]]+$/,""); tokens.push({start:bs,end:bs+url.length,label:url,url:url}); }
   tokens.sort(function(a,b){return a.start-b.start;});
   var out="", pos=0;
-  tokens.forEach(function(t){ if(t.start<pos)return; out+=esc(raw.slice(pos,t.start)).replace(/\n/g,"<br>"); out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+esc(t.label)+'</a>'; pos=t.end; });
-  out+=esc(raw.slice(pos)).replace(/\n/g,"<br>");
+  tokens.forEach(function(t){ if(t.start<pos)return; out+=mdEmph(esc(raw.slice(pos,t.start))); out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; });
+  out+=mdEmph(esc(raw.slice(pos)));
   return out;
 }
-function notesToPlain(raw){ return (raw==null?"":(""+raw)).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_,label,url){ return label+" ("+url+")"; }); }   // for plain-text targets (calendar)
+// full notes -> safe HTML: bulleted/numbered lists (block) + inline formatting + <br> between text lines
+function renderNotesHTML(raw){
+  raw=(raw==null?"":(""+raw)).replace(/\r\n?/g,"\n");
+  var lines=raw.split("\n"), chunks=[], listType=null, items=[];
+  function flush(){ if(listType){ chunks.push("<"+listType+' style="margin:4px 0;padding-left:22px">'+items.join("")+"</"+listType+">"); listType=null; items=[]; } }
+  for(var i=0;i<lines.length;i++){
+    var ln=lines[i], ul=ln.match(/^[ \t]*[-*]\s+(.*)$/), ol=ln.match(/^[ \t]*\d+\.\s+(.*)$/);
+    if(ul){ if(listType&&listType!=="ul")flush(); listType="ul"; items.push("<li>"+inlineRender(ul[1])+"</li>"); }
+    else if(ol){ if(listType&&listType!=="ol")flush(); listType="ol"; items.push("<li>"+inlineRender(ol[1])+"</li>"); }
+    else { flush(); chunks.push(inlineRender(ln)); }
+  }
+  flush();
+  var html="";
+  for(var j=0;j<chunks.length;j++){ var c=chunks[j], isList=/^<(ul|ol)/.test(c); if(j>0){ var prevList=/^<(ul|ol)/.test(chunks[j-1]); if(!isList && !prevList) html+="<br>"; } html+=c; }
+  return html;
+}
+function notesToPlain(raw){ return (raw==null?"":(""+raw))   // for plain-text targets (calendar): drop markers, keep readable list prefixes
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_,label,url){ return label+" ("+url+")"; })
+  .replace(/\*\*([^*\n]+)\*\*/g, "$1")
+  .replace(/__([^_\n]+)__/g, "$1")
+  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2"); }
 function insertLinkAtCursor(ta, after){   // inserts [text](https://) at the caret; selects a placeholder for quick typing
   try{ ta.focus(); }catch(e){}
   var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
@@ -310,6 +338,38 @@ function insertLinkAtCursor(ta, after){   // inserts [text](https://) at the car
   if(sel){ var us=s+label.length+3; ta.setSelectionRange(us, us+8); }   // had text selected -> select the https:// to paste over
   else { ta.setSelectionRange(s+1, s+1+label.length); }                  // nothing selected -> select the "link text" placeholder
   if(after) after(ta.value);
+}
+// wrap the selection (or a placeholder) in a marker, e.g. ** for bold
+function fmtWrap(ta, mark, placeholder, after){
+  try{ ta.focus(); }catch(e){}
+  var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
+  var v=ta.value, had=v.slice(s,e), sel=had||placeholder;
+  ta.value=v.slice(0,s)+mark+sel+mark+v.slice(e);
+  ta.setSelectionRange(s+mark.length, s+mark.length+sel.length);   // keep the inner text selected
+  if(after) after(ta.value);
+}
+// turn the selected line(s) into a bulleted or numbered list (re-numbers; toggles existing markers)
+function fmtList(ta, ordered, after){
+  try{ ta.focus(); }catch(e){}
+  var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=0; e=0; }
+  var v=ta.value, ls=v.lastIndexOf("\n", s-1)+1, le=v.indexOf("\n", e); if(le<0) le=v.length;
+  var lines=v.slice(ls,le).split("\n"), n=1;
+  var out=lines.map(function(ln){ var body=ln.replace(/^[ \t]*(?:[-*]\s+|\d+\.\s+)/,""); if(!body.trim()) return ln; return ordered ? ((n++)+". "+body) : ("- "+body); }).join("\n");
+  ta.value=v.slice(0,ls)+out+v.slice(le);
+  ta.setSelectionRange(ls, ls+out.length);
+  if(after) after(ta.value);
+}
+// a compact formatting toolbar bound to a textarea (Bold/Italic/Underline/lists/link)
+function notesToolbar(ta, after){
+  var bar=el('<div class="row" style="gap:4px; flex-wrap:wrap; align-items:center"></div>');
+  function mk(html, title, fn){ var b=el('<button type="button" class="btn" style="padding:4px 9px; font-size:13px; min-width:30px; justify-content:center" title="'+title+'">'+html+'</button>'); b.onmousedown=function(e){ e.preventDefault(); }; b.onclick=function(e){ e.preventDefault(); fn(); }; bar.appendChild(b); return b; }
+  mk('<b>B</b>', 'Bold — **text**', function(){ fmtWrap(ta,"**","bold text",after); });
+  mk('<i>I</i>', 'Italic — *text*', function(){ fmtWrap(ta,"*","italic text",after); });
+  mk('<u>U</u>', 'Underline — __text__', function(){ fmtWrap(ta,"__","underlined text",after); });
+  mk('&bull;', 'Bulleted list', function(){ fmtList(ta,false,after); });
+  mk('1.', 'Numbered list', function(){ fmtList(ta,true,after); });
+  mk(ic('link'), 'Insert hyperlink', function(){ insertLinkAtCursor(ta,after); });
+  return bar;
 }
 function ic(n,sz){ sz=sz||16; var P={
  download:'<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
@@ -719,7 +779,7 @@ function buildTodoFeed(){
     var due = hasDate ? (t.dueDate + "T12:00:00Z") : null;
     // reminder is the real instant in UTC (local date+time converted)
     var rem = hasRem ? toUtcInstant(t.dueDate, t.dueTime) : null;
-    var body = linkifyNotes((t.notes||"").trim());   // To Do body is HTML: escapes, turns links into anchors, \n -> <br>
+    var body = renderNotesHTML((t.notes||"").trim());   // To Do body is HTML: escapes, renders **bold**/lists/links, \n -> <br>
     // visible recurrence marker (To Do has no native repeat field via the connector; this just shows it repeats)
     var recurLine = (t.recur && t.recur!=="none") ? ("🔁 Repeats "+(RECUR_LABEL[t.recur]||"").toLowerCase()) : "";
     var parts=[]; if(body) parts.push(body); if(recurLine) parts.push(recurLine); parts.push("[taskhub:"+t.id+"]");
@@ -1083,7 +1143,7 @@ function renderAddBox(th){
   syncDate();
 
   var noteInp=el('<textarea class="field" rows="2" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; margin-top:10px; resize:vertical"></textarea>'); noteInp.value=draftNotes; noteInp.oninput=function(){ draftNotes=noteInp.value; }; extra.appendChild(noteInp);
-  var nLinkRow=el('<div class="row" style="margin-top:6px"></div>'); var nLinkA=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLinkA.onclick=function(){ insertLinkAtCursor(noteInp, function(v){ draftNotes=v; }); }; nLinkRow.appendChild(nLinkA); extra.appendChild(nLinkRow);
+  var nbar=notesToolbar(noteInp, function(v){ draftNotes=v; }); nbar.style.marginTop="8px"; extra.appendChild(nbar);
   box.appendChild(extra);
 
   function doAdd(){ var title=(inp.value||"").trim(); if(!title){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; } var dd=draftDate||null, tt2=(draftRemind&&draftDate)?(draftTime||"09:00"):null, pr=draftPrio, nt=draftNotes; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; addTask(title, targetList, null, pr, dd, tt2, nt); var a2=document.getElementById("addInput"); if(a2)a2.focus(); }
@@ -1246,9 +1306,9 @@ function buildNotePop(t){
   var pop=el('<div class="editpop" role="dialog" aria-label="Note" style="min-width:min(420px,92vw)"></div>');
   pop.onclick=function(e){ e.stopPropagation(); };
   var ta=el('<textarea class="field" rows="10" aria-label="Note" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; min-height:220px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
-  var nLink=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px; justify-self:start" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLink.onclick=function(){ insertLinkAtCursor(ta); };
-  pop.appendChild(nLink); pop.appendChild(ta);
-  if(noteHasLink(t.notes)){ var npv=el('<div class="note-preview"></div>'); npv.innerHTML=linkifyNotes(t.notes); pop.appendChild(npv); }
+  pop.appendChild(notesToolbar(ta));
+  pop.appendChild(ta);
+  if(noteHasFmt(t.notes)){ var npv=el('<div class="note-preview"></div>'); npv.innerHTML=renderNotesHTML(t.notes); pop.appendChild(npv); }
   return pop;
 }
 function buildListPop(t){
@@ -1342,10 +1402,10 @@ function renderTask(t){
   // quick one-line note (collapsed view only): type to add a note without expanding; expand for long/multi-line notes
   if(!expanded[t.id] && !selectMode){
     var nt=t.notes||"";
-    if(nt.indexOf("\n")>=0 || noteHasLink(nt)){   // multi-line or has a link -> clickable preview (links open; clicking elsewhere opens the editor)
+    if(noteHasFmt(nt)){   // multi-line, link, or formatting -> clickable rendered preview (links open; clicking elsewhere opens the editor)
       var fl=nt.split("\n")[0]||"(note)";
       var multi=nt.indexOf("\n")>=0;
-      var prev=el('<div class="qnote-prev" title="Click to edit (links open in a new tab)"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+linkifyNotes(fl)+'</span>'+(multi?' <span class="more">&#8943; more</span>':'')+'</div>');
+      var prev=el('<div class="qnote-prev" title="Click to edit (links open in a new tab)"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+inlineRender(fl)+'</span>'+(multi?' <span class="more">&#8943; more</span>':'')+'</div>');
       prev.onclick=function(e){ if(e.target.closest("a")) return; e.stopPropagation(); expanded[t.id]=true; render(); };
       mid.appendChild(prev);
     } else {
@@ -1395,9 +1455,9 @@ function renderTask(t){
     g3.appendChild(recSel); g3.appendChild(listSel2); d.appendChild(g3);
     var ta=el('<textarea class="field" rows="6" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description. Tip: click Link or paste a URL" style="width:100%; min-height:140px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
     var nHead=el('<div class="row" style="gap:8px; align-items:center"></div>'); nHead.appendChild(el('<label class="lbl" style="margin-right:auto">Notes</label>'));
-    var nLink=el('<button type="button" class="btn" style="padding:4px 9px; font-size:12px" title="Insert a hyperlink — [text](https://...)">'+ic('link')+' Link</button>'); nLink.onclick=function(){ insertLinkAtCursor(ta); }; nHead.appendChild(nLink);
+    nHead.appendChild(notesToolbar(ta));
     d.appendChild(nHead); d.appendChild(ta);
-    if(noteHasLink(t.notes)){ d.appendChild(el('<div class="lbl" style="margin-top:2px">Preview</div>')); var npv=el('<div class="note-preview"></div>'); npv.innerHTML=linkifyNotes(t.notes); d.appendChild(npv); }
+    if(noteHasFmt(t.notes)){ d.appendChild(el('<div class="lbl" style="margin-top:2px">Preview</div>')); var npv=el('<div class="note-preview"></div>'); npv.innerHTML=renderNotesHTML(t.notes); d.appendChild(npv); }
     // task ID (for reference / matching the [taskhub:id] tag in Microsoft To Do) — click to copy
     var idRow=el('<div class="muted" style="font-size:12px; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">Task ID: <code style="font-family:Consolas,monospace; background:'+(darkMode?"#1c1b19":"#f1f5f9")+'; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; padding:1px 6px; border-radius:6px">'+esc(t.id)+'</code></div>');
     var copyId=el('<button type="button" class="btn" style="padding:3px 8px; font-size:12px" title="Copy task ID">'+ic('checksq')+' Copy</button>');
