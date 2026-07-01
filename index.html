@@ -980,6 +980,11 @@ function renderBulkBar(){
   due.disabled = ids.length===0;
   due.onchange=function(){ var v=due.value; if(!v)return; var d=null; if(v==="today")d=todayStr(); else if(v==="tomorrow")d=addDays(todayStr(),1); else if(v==="weekend")d=dowDate(6,true); else if(v==="nextweek")d=dowDate(1,false); else d=null; setDueSelected(d); due.value=""; };
   bar.appendChild(due);
+  // pick a specific date (calendar) for the selection
+  var duePick=el('<input type="date" class="field" aria-label="Set a specific due date" title="Pick a specific due date for the selected tasks" />');
+  duePick.disabled = ids.length===0;
+  duePick.onchange=function(){ if(duePick.value){ setDueSelected(duePick.value); duePick.value=""; } };
+  bar.appendChild(duePick);
   var prio=el('<select class="field" aria-label="Set priority"><option value="">Set priority...</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>'); prio.disabled=ids.length===0; prio.onchange=function(){ if(prio.value){ setPrioSelected(prio.value); prio.value=""; } }; bar.appendChild(prio);
   var lst=el('<select class="field" aria-label="Move to list"><option value="">Move to list...</option><option value="personal">Personal</option><option value="work">Work</option></select>'); lst.disabled=ids.length===0; lst.onchange=function(){ if(lst.value){ setListSelected(lst.value); lst.value=""; } }; bar.appendChild(lst);
   var del=el('<button class="btn btn-danger">'+ic('trash')+' Delete</button>'); del.disabled=ids.length===0; del.onclick=function(){ if(ids.length) deleteSelected(); }; bar.appendChild(del);
