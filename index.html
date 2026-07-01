@@ -1418,9 +1418,16 @@ function renderTask(t){
 
   mid.appendChild(m);
   // quick one-line note (collapsed view only): type to add a note without expanding; expand for long/multi-line notes
-  if(!expanded[t.id] && !selectMode){
+  if(!expanded[t.id]){
     var nt=t.notes||"";
-    if(noteHasFmt(nt)){   // multi-line, link, or formatting -> clickable rendered preview (links open; clicking elsewhere opens the editor)
+    if(selectMode){
+      // Select mode: show any note read-only (no editing) so rows keep their size and you can see what you're picking
+      if(nt.trim()){
+        var flS=nt.split("\n")[0]||"(note)";
+        var prevS=el('<div class="qnote-prev" style="cursor:default"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+inlineRender(flS)+'</span>'+(nt.indexOf("\n")>=0?' <span class="more">&#8943; more</span>':'')+'</div>');
+        mid.appendChild(prevS);
+      }
+    } else if(noteHasFmt(nt)){   // multi-line, link, or formatting -> clickable rendered preview (links open; clicking elsewhere opens the editor)
       var fl=nt.split("\n")[0]||"(note)";
       var multi=nt.indexOf("\n")>=0;
       var prev=el('<div class="qnote-prev" title="Click to edit (links open in a new tab)"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+inlineRender(fl)+'</span>'+(multi?' <span class="more">&#8943; more</span>':'')+'</div>');
