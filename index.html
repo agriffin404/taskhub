@@ -976,14 +976,14 @@ function renderBulkBar(){
   bar.appendChild(el('<b style="font-size:15px">'+ids.length+' selected</b>'));
   var allBtn=el('<button class="btn">Select all visible</button>'); allBtn.onclick=function(){ currentVisibleIds().forEach(function(i){ selected[i]=true; }); render(); }; bar.appendChild(allBtn);
   var clr=el('<button class="btn">Clear</button>'); clr.onclick=function(){ selected={}; selAnchor=null; render(); }; bar.appendChild(clr);
-  var due=el('<select class="field"><option value="">Set due date...</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="weekend">This weekend (Sat)</option><option value="nextweek">Next week (Mon)</option><option value="none">Remove due date</option></select>');
+  var due=el('<select class="field"><option value="">Set due date...</option><option value="pick">📅 Pick a date…</option><option value="today">Today</option><option value="tomorrow">Tomorrow</option><option value="weekend">This weekend (Sat)</option><option value="nextweek">Next week (Mon)</option><option value="none">Remove due date</option></select>');
   due.disabled = ids.length===0;
-  due.onchange=function(){ var v=due.value; if(!v)return; var d=null; if(v==="today")d=todayStr(); else if(v==="tomorrow")d=addDays(todayStr(),1); else if(v==="weekend")d=dowDate(6,true); else if(v==="nextweek")d=dowDate(1,false); else d=null; setDueSelected(d); due.value=""; };
-  bar.appendChild(due);
-  // pick a specific date (calendar) for the selection
-  var duePick=el('<input type="date" class="field" aria-label="Set a specific due date" title="Pick a specific due date for the selected tasks" />');
+  // hidden native date input the "Pick a date…" option opens (and can be clicked directly)
+  var duePick=el('<input type="date" class="field" aria-label="Set a specific due date" title="Pick a specific due date for the selected tasks" style="width:150px" />');
   duePick.disabled = ids.length===0;
   duePick.onchange=function(){ if(duePick.value){ setDueSelected(duePick.value); duePick.value=""; } };
+  due.onchange=function(){ var v=due.value; if(!v)return; if(v==="pick"){ due.value=""; try{ duePick.showPicker(); }catch(e){ duePick.focus(); } return; } var d=null; if(v==="today")d=todayStr(); else if(v==="tomorrow")d=addDays(todayStr(),1); else if(v==="weekend")d=dowDate(6,true); else if(v==="nextweek")d=dowDate(1,false); else d=null; setDueSelected(d); due.value=""; };
+  bar.appendChild(due);
   bar.appendChild(duePick);
   var prio=el('<select class="field" aria-label="Set priority"><option value="">Set priority...</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>'); prio.disabled=ids.length===0; prio.onchange=function(){ if(prio.value){ setPrioSelected(prio.value); prio.value=""; } }; bar.appendChild(prio);
   var lst=el('<select class="field" aria-label="Move to list"><option value="">Move to list...</option><option value="personal">Personal</option><option value="work">Work</option></select>'); lst.disabled=ids.length===0; lst.onchange=function(){ if(lst.value){ setListSelected(lst.value); lst.value=""; } }; bar.appendChild(lst);
