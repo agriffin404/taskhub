@@ -1496,8 +1496,14 @@ function renderEvents(){
   var filtered=all.filter(function(e){ return !(hideDeclined && e.title.indexOf("Declined:")===0); });
   var head=el('<div class="row" role="button" tabindex="0" aria-expanded="'+evOpen+'" aria-label="Upcoming events, '+filtered.length+' shown" style="padding:12px 16px; cursor:pointer"></div>');
   head.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); evOpen=!evOpen; render(); } };
-  var next=filtered.filter(function(e){return !e.allDay;})[0]||filtered[0];
-  head.innerHTML='<div style="width:34px;height:34px;border-radius:8px;background:'+(darkMode?"#262445":"#eef2ff")+';color:'+(darkMode?"#a5b4fc":"#6366f1")+';display:flex;align-items:center;justify-content:center">'+ic('calendar',18)+'</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px">Upcoming Events</b> <span class="pill">'+filtered.length+'</span>'+(liveEvents?' <span class="pill" style="background:'+(darkMode?"#10271e":"#dcfce7")+';color:'+(darkMode?"#34d399":"#166534")+'">Live</span>':'')+'</div><div class="muted" style="font-size:13px">'+(evOpen?("Outlook &middot; "+esc(evRangeLabel())):(next?esc(next.title).slice(0,46):"No events"))+'</div></div><div class="muted">'+(evOpen?"&#9662;":"&#9656;")+'</div>';
+  // soonest UPCOMING event (chronological) — not just the first in the file's arbitrary order
+  var evTodayK=todayStr(), evNowMs=Date.now();
+  function evStartMs(e){ var p=e.date.split("-").map(Number), d=new Date(p[0],p[1]-1,p[2]); if(!e.allDay && e.start) d=new Date(d.getTime()+clockMin(e.start)*60000); return d.getTime(); }
+  var evSorted=filtered.slice().sort(function(a,b){ return evStartMs(a)-evStartMs(b); });
+  var evUp=evSorted.filter(function(e){ return e.allDay ? e.date>=evTodayK : evStartMs(e)>=evNowMs; });
+  var next=evUp.filter(function(e){return !e.allDay;})[0] || evUp[0] || evSorted[0] || null;   // prefer soonest timed meeting; fall back to all-day / earliest
+  var nextLabel=next ? (((next.date===evTodayK)?"Today · ":(next.date===addDays(evTodayK,1))?"Tomorrow · ":"")+next.title) : "";
+  head.innerHTML='<div style="width:34px;height:34px;border-radius:8px;background:'+(darkMode?"#262445":"#eef2ff")+';color:'+(darkMode?"#a5b4fc":"#6366f1")+';display:flex;align-items:center;justify-content:center">'+ic('calendar',18)+'</div><div style="flex:1;min-width:0"><div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px">Upcoming Events</b> <span class="pill">'+filtered.length+'</span>'+(liveEvents?' <span class="pill" style="background:'+(darkMode?"#10271e":"#dcfce7")+';color:'+(darkMode?"#34d399":"#166534")+'">Live</span>':'')+'</div><div class="muted" style="font-size:13px">'+(evOpen?("Outlook &middot; "+esc(evRangeLabel())):(next?(esc(nextLabel.slice(0,48))+(nextLabel.length>48?"&hellip;":"")):"No upcoming events"))+'</div></div><div class="muted">'+(evOpen?"&#9662;":"&#9656;")+'</div>';
   head.onclick=function(){ evOpen=!evOpen; render(); };
   card.appendChild(head);
   if(evOpen){
