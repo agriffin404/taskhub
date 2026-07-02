@@ -18,11 +18,13 @@ This repository contains **only the app** (`index.html`) — no personal data of
 - **Inline editing** — click any chip to change due date, reminder, priority, list, or recurrence; quick one-line notes without expanding.
 - **Recurrence** — daily, weekdays, weekly, monthly, annually; completing a task rolls the next due date forward.
 - **Reminders & calendar** — set a reminder time; export any task to `.ics`, Google Calendar, or Outlook.
-- **Notes with links** — insert hyperlinks or paste URLs; they render clickable and carry through to synced apps.
+- **Notes with formatting** — bold/italic/underline, bulleted & numbered lists, hyperlinks, and **checklists** (`- [ ]` items you can tick right from the preview); everything carries through to synced apps.
 - **Undo everywhere** — a bottom toast with Undo on completes, edits, moves, and deletes (plus multi-level Ctrl+Z).
 - **Search, filters, sort & grouping**, bulk select, drag-to-reschedule, and a Recently Deleted bin (30-day retention).
 - **Completed archive** — completed tasks older than 90 days are tucked into an archive section of your data file.
-- **Compact density toggle**, light/dark themes, keyboard shortcuts, and a sticky "Today's Calendar" rail on wide screens.
+- **One-click triage** — "Move all to Today" on the overdue section; snooze chips (+1 day / +1 week / next Monday) on any task.
+- **Compact density toggle**, light/dark themes, keyboard shortcuts, a weekly completions counter, and a sticky "Today's Calendar" rail with Teams join links on wide screens.
+- **Installable** — a web manifest lets you install it as a standalone app (Edge/Chrome "Install app", iOS "Add to Home Screen").
 
 ## Microsoft 365 sync (optional)
 
