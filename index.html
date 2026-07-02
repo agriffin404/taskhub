@@ -1317,18 +1317,6 @@ function buildPrioPop(t){
   ["high","medium","low"].forEach(function(p){ var mp=PRIO[p]; var active=t.priority===p; var b=el('<button type="button" class="chip" aria-pressed="'+active+'" style="justify-content:flex-start'+(active?";background:"+pBg(p)+";color:"+pT(p)+";border-color:"+pBd(p):"")+'"><span aria-hidden="true" style="width:8px;height:8px;border-radius:9999px;background:'+mp.dot+';display:inline-block"></span> '+mp.label+'</button>'); b.onclick=function(){ popover=null; updateTask(t.id,{priority:p}); }; pop.appendChild(b); });
   return pop;
 }
-function buildNotePop(t){
-  var pop=el('<div class="editpop" role="dialog" aria-label="Note" style="min-width:min(420px,92vw)"></div>');
-  pop.onclick=function(e){ e.stopPropagation(); };
-  var ta=el('<textarea class="field" rows="10" aria-label="Note" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; min-height:220px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
-  pop.appendChild(notesToolbar(ta));
-  pop.appendChild(ta);
-  var npv=el('<div class="note-preview"></div>');
-  function refreshPv(val){ var has=!!(val&&val.trim()); npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val); }
-  refreshPv(t.notes||""); ta.oninput=function(){ refreshPv(ta.value); };   // live preview as you type
-  pop.appendChild(npv);
-  return pop;
-}
 function buildListPop(t){
   var pop=el('<div class="editpop" role="dialog" aria-label="Move to list" style="min-width:150px"></div>');
   pop.onclick=function(e){ e.stopPropagation(); };
@@ -1480,7 +1468,8 @@ function renderTask(t){
     g3.appendChild(recSel); g3.appendChild(listSel2); d.appendChild(g3);
     var ta=el('<textarea class="field" rows="6" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description. Tip: click Link or paste a URL" style="width:100%; min-height:140px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
     var nHead=el('<div class="row" style="gap:8px; align-items:center"></div>'); nHead.appendChild(el('<label class="lbl" style="margin-right:auto">Notes</label>'));
-    nHead.appendChild(notesToolbar(ta));
+    // toolbar edits set ta.value programmatically (no change/input event fires) — commit + refresh explicitly
+    nHead.appendChild(notesToolbar(ta, function(v){ saveNoteQuiet(t.id, v); refreshPv(v); }));
     d.appendChild(nHead); d.appendChild(ta);
     var pvLabel=el('<div class="lbl" style="margin-top:2px">Preview</div>'), npv=el('<div class="note-preview"></div>');
     function refreshPv(val){ var has=!!(val&&val.trim()); pvLabel.style.display=has?"":"none"; npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val); }
