@@ -6,6 +6,12 @@
 <meta name="color-scheme" content="light dark" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjOGI1Y2Y2Ii8+PHN0b3Agb2Zmc2V0PSIuNSIgc3RvcC1jb2xvcj0iIzYzNjZmMSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBlYTVlOSIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgcng9IjciIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNOSAxNi41bDQuNSA0LjVMMjMgMTEiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=" />
 <title>TaskHub</title>
+<meta name="theme-color" content="#6366f1" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="TaskHub" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <style>
   :root { --vio1:#8b5cf6; --vio2:#ec4899; --sky1:#0ea5e9; --sky2:#14b8a6; }
   * { box-sizing: border-box; }
@@ -311,14 +317,21 @@ function inlineRender(raw){
   out+=mdEmph(esc(raw.slice(pos)));
   return out;
 }
-// full notes -> safe HTML: bulleted/numbered lists (block) + inline formatting + <br> between text lines
-function renderNotesHTML(raw){
+// full notes -> safe HTML: checklists + bulleted/numbered lists (block) + inline formatting + <br> between text lines
+// interactive=true renders real checkboxes (data-ck index for toggling); default renders ☐/☑ glyphs (for To Do)
+function renderNotesHTML(raw, interactive){
   raw=(raw==null?"":(""+raw)).replace(/\r\n?/g,"\n");
-  var lines=raw.split("\n"), chunks=[], listType=null, items=[];
+  var lines=raw.split("\n"), chunks=[], listType=null, items=[], ck=0;
   function flush(){ if(listType){ chunks.push("<"+listType+' style="margin:4px 0;padding-left:22px">'+items.join("")+"</"+listType+">"); listType=null; items=[]; } }
   for(var i=0;i<lines.length;i++){
-    var ln=lines[i], ul=ln.match(/^[ \t]*[-*]\s+(.*)$/), ol=ln.match(/^[ \t]*\d+\.\s+(.*)$/);
-    if(ul){ if(listType&&listType!=="ul")flush(); listType="ul"; items.push("<li>"+inlineRender(ul[1])+"</li>"); }
+    var ln=lines[i], cb=ln.match(/^[ \t]*[-*]\s+\[( |x|X)\]\s?(.*)$/), ul=ln.match(/^[ \t]*[-*]\s+(.*)$/), ol=ln.match(/^[ \t]*\d+\.\s+(.*)$/);
+    if(cb){ if(listType&&listType!=="ul")flush(); listType="ul";
+      var done=cb[1]!==" ", ckTxt=(done?'<span style="text-decoration:line-through;opacity:.65">':"<span>")+inlineRender(cb[2])+"</span>";
+      if(interactive){ items.push('<li style="list-style:none;margin-left:-18px"><label style="display:flex;gap:7px;align-items:flex-start;cursor:pointer;font:inherit"><input type="checkbox" data-ck="'+ck+'"'+(done?" checked":"")+' style="margin-top:3px;accent-color:#6366f1;cursor:pointer">'+ckTxt+'</label></li>'); }
+      else { items.push('<li style="list-style:none;margin-left:-18px">'+(done?"&#9745;":"&#9744;")+" "+ckTxt+"</li>"); }
+      ck++;
+    }
+    else if(ul){ if(listType&&listType!=="ul")flush(); listType="ul"; items.push("<li>"+inlineRender(ul[1])+"</li>"); }
     else if(ol){ if(listType&&listType!=="ol")flush(); listType="ol"; items.push("<li>"+inlineRender(ol[1])+"</li>"); }
     else { flush(); chunks.push(inlineRender(ln)); }
   }
@@ -358,17 +371,21 @@ function fmtWrap(ta, mark, placeholder, after){
   }
   if(after) after(ta.value);
 }
-// turn the selected line(s) into a bulleted or numbered list (re-numbers; toggles existing markers)
-function fmtList(ta, ordered, after){
+// turn the selected line(s) into a bulleted, numbered, or checklist list (re-numbers; converts existing markers)
+function fmtList(ta, kind, after){   // kind: "ul" | "ol" | "ck"
   try{ ta.focus(); }catch(e){}
   var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=0; e=0; }
   var v=ta.value, ls=v.lastIndexOf("\n", s-1)+1, le=v.indexOf("\n", e); if(le<0) le=v.length;
   var lines=v.slice(ls,le).split("\n"), n=1;
-  var out=lines.map(function(ln){ var body=ln.replace(/^[ \t]*(?:[-*]\s+|\d+\.\s+)/,""); if(!body.trim()) return ln; return ordered ? ((n++)+". "+body) : ("- "+body); }).join("\n");
+  var out=lines.map(function(ln){ var body=ln.replace(/^[ \t]*(?:[-*]\s+(?:\[[ xX]\]\s*)?|\d+\.\s+)/,""); if(!body.trim()) return ln; return kind==="ol" ? ((n++)+". "+body) : kind==="ck" ? ("- [ ] "+body) : ("- "+body); }).join("\n");
   ta.value=v.slice(0,ls)+out+v.slice(le);
   ta.setSelectionRange(ls, ls+out.length);
   if(after) after(ta.value);
 }
+// flip the Nth checkbox ([ ] <-> [x]) in the raw note text
+function toggleNoteCk(raw, idx){ var n=-1; return (""+raw).replace(/^([ \t]*[-*]\s+\[)( |x|X)(\])/gm, function(mm,a,b,c){ n++; return n===idx ? (a+(b===" "?"x":" ")+c) : mm; }); }
+// collapsed one-line previews: show a checkbox first line as a glyph instead of raw "- [ ]"
+function ckGlyphLine(fl){ var m=fl.match(/^[ \t]*[-*]\s+\[( |x|X)\]\s?(.*)$/); return m ? ((m[1]===" "?"☐ ":"☑ ")+m[2]) : fl; }
 // a compact formatting toolbar bound to a textarea (Bold/Italic/Underline/lists/link)
 function notesToolbar(ta, after){
   var bar=el('<div class="row" style="gap:4px; flex-wrap:wrap; align-items:center"></div>');
@@ -376,8 +393,9 @@ function notesToolbar(ta, after){
   mk('<b>B</b>', 'Bold — **text**', function(){ fmtWrap(ta,"**","bold text",after); });
   mk('<i>I</i>', 'Italic — *text*', function(){ fmtWrap(ta,"*","italic text",after); });
   mk('<u>U</u>', 'Underline — __text__', function(){ fmtWrap(ta,"__","underlined text",after); });
-  mk('&bull;', 'Bulleted list', function(){ fmtList(ta,false,after); });
-  mk('1.', 'Numbered list', function(){ fmtList(ta,true,after); });
+  mk('&bull;', 'Bulleted list', function(){ fmtList(ta,"ul",after); });
+  mk('1.', 'Numbered list', function(){ fmtList(ta,"ol",after); });
+  mk('&#9745;', 'Checklist — tick items right from the preview', function(){ fmtList(ta,"ck",after); });
   mk(ic('link'), 'Insert hyperlink', function(){ insertLinkAtCursor(ta,after); });
   return bar;
 }
@@ -580,13 +598,16 @@ function normEvents(e){   // returns an array (all-day events that span multiple
   var title=String(e.title||e.subject);
   var teams=!!(e.teams||e.isOnlineMeeting);
   var showAs=(typeof e.showAs==="string" && SHOWAS[e.showAs]) ? e.showAs : "busy";
+  // Teams join link if the flow supplies one (joinUrl / onlineMeetingUrl); http(s) only
+  var joinRaw=(typeof e.joinUrl==="string"&&e.joinUrl)||(typeof e.onlineMeetingUrl==="string"&&e.onlineMeetingUrl)||null;
+  var join=(joinRaw && /^https?:\/\//i.test(joinRaw)) ? joinRaw : null;
   if(e.allDay || e.isAllDay){
     // floating dates: use the literal date portion (NO timezone conversion); end is exclusive (Outlook)
     var sd=e.date || datePart(e.start); if(!sd) return [];
     var ed=datePart(e.end);
     var out=[];
-    if(ed && ed>sd){ var d=sd, guard=0; while(d<ed && guard<60){ out.push({title:title,date:d,allDay:true,start:null,end:null,teams:teams,showAs:showAs}); d=addDays(d,1); guard++; } }
-    else { out.push({title:title,date:sd,allDay:true,start:null,end:null,teams:teams,showAs:showAs}); }
+    if(ed && ed>sd){ var d=sd, guard=0; while(d<ed && guard<60){ out.push({title:title,date:d,allDay:true,start:null,end:null,teams:teams,showAs:showAs,join:join}); d=addDays(d,1); guard++; } }
+    else { out.push({title:title,date:sd,allDay:true,start:null,end:null,teams:teams,showAs:showAs,join:join}); }
     return out;
   }
   // timed event: offset-aware local time/date
@@ -594,7 +615,7 @@ function normEvents(e){   // returns an array (all-day events that span multiple
   if(isISO(start)){ if(!date) date=localDateFromISO(start); start=fmtClockFromISO(start); }
   if(isISO(end)){ end=fmtClockFromISO(end); }
   if(!date) return [];
-  return [{ title:title, date:String(date), allDay:false, start:start||null, end:end||null, teams:teams, showAs:showAs }];
+  return [{ title:title, date:String(date), allDay:false, start:start||null, end:end||null, teams:teams, showAs:showAs, join:join }];
 }
 function parseEventsPayload(text){
   var parsed=JSON.parse(text);
@@ -949,6 +970,13 @@ function reorderTask(dragId, targetId){   // manual ("My order") drag: place dra
   save(); render(); toast("Reordered", {label:"Undo", fn:doUndo});
 }
 function clearDone(){ var v=view; var hit=function(t){ var inScope=(v==="combined"||v==="today")?true:t.list===v; return inScope&&t.completed&&!t.deletedAt; }; if(!store.tasks.some(hit))return; pushHistory(); var now=Date.now(); store.tasks=store.tasks.map(function(t){ return hit(t)?Object.assign({},t,{deletedAt:now}):t; }); save(); render(); toast("Cleared completed", {label:"Undo", fn:doUndo}); }
+function moveOverdueToToday(){   // one-click daily triage: everything overdue (in the current view's scope) -> due today
+  var tk=todayStr();
+  var hit=function(t){ var inScope=(view==="combined"||view==="today")?true:t.list===view; return inScope && !t.deletedAt && !t.completed && t.dueDate && t.dueDate<tk; };
+  var n=store.tasks.filter(hit).length; if(!n) return;
+  pushHistory(); store.tasks=store.tasks.map(function(t){ return hit(t)?Object.assign({},t,{dueDate:tk}):t; }); save(); render();
+  toast("Moved "+n+" overdue task"+(n===1?"":"s")+" to Today", {label:"Undo", fn:doUndo});
+}
 function selectedIds(){ return Object.keys(selected).filter(function(k){return selected[k];}); }
 function currentVisibleIds(){ if(view==="today"){ var tk=todayStr(); return store.tasks.filter(function(t){ return !t.deletedAt && ((t.dueDate&&t.dueDate<tk&&!t.completed)||t.dueDate===tk||(!t.completed&&!t.dueDate)); }).map(function(t){return t.id;}); } return visibleTasks().map(function(t){return t.id;}); }
 // ids in the exact on-screen order (grouped + sorted) — for Ctrl+A and Shift-range selection
@@ -1014,7 +1042,10 @@ function render(){
   // header
   var hdr=el('<div class="hdr"></div>');
   var hi=el('<div class="hdr-inner" style="background:'+th.grad+'"></div>');
-  hi.appendChild(el('<div><h1>TaskHub</h1><p>'+active+' active &middot; '+done+' done</p></div>'));
+  // weekly wins: completed since Monday 00:00 (same scope as the active/done counts)
+  var wkStart=(function(){ var d=new Date(); d.setHours(0,0,0,0); return d.getTime()-((d.getDay()+6)%7)*86400000; })();
+  var wkDone=store.tasks.filter(function(t){ return !t.deletedAt && t.completed && typeof t.completedAt==="number" && t.completedAt>=wkStart && ((isComb||isToday)||t.list===view); }).length;
+  hi.appendChild(el('<div><h1>TaskHub</h1><p>'+active+' active &middot; '+done+' done'+(wkDone?' &middot; &#10003; '+wkDone+' this week':'')+'</p></div>'));
   var tabs=el('<div class="tabs" role="tablist" aria-label="Task views"></div>');
   var tabOrder=["today","combined","work","personal"];
   tabOrder.forEach(function(v){ var t=THEME[v]; var b=el('<button class="tab'+(view===v?" active":"")+'" role="tab" aria-selected="'+(view===v)+'" tabindex="'+(view===v?"0":"-1")+'"></button>'); b.style.color = view===v ? t.accent : "rgba(255,255,255,.9)"; var u=urgentCount(v); b.innerHTML = t.label + (u>0?' <span class="badge" aria-label="'+u+' urgent">'+u+'</span>':''); b.setAttribute("aria-label", t.label+(u>0?" ("+u+" urgent)":"")); b.onclick=function(){ view=v; render(); }; tabs.appendChild(b); });
@@ -1274,6 +1305,7 @@ function renderGroups(){
     var sect=el('<div class="sect" id="group-'+g.k+'" data-group="'+g.k+'"></div>');
     var nameHtml = (g.name===null) ? "" : ('<h2'+(hColor?' style="color:'+hColor+'"':'')+'>'+esc(g.name)+'</h2> ');
     var h=el('<div class="sect-h"><div class="left">'+nameHtml+'<span class="pill"'+(pillStyle?' style="'+pillStyle+'"':'')+'>'+tasks.length+'</span></div></div>');
+    if(isE && filter!=="completed"){ var mvBtn=el('<button class="btn" style="padding:4px 10px; font-size:12px" title="Reschedule every overdue task to today">'+ic('calplus')+' Move all to Today</button>'); mvBtn.onclick=moveOverdueToToday; h.appendChild(mvBtn); }
     sect.appendChild(h);
     if(tasks.length===0){ sect.appendChild(el('<div class="empty">'+esc(spec.hint(g))+'</div>')); }
     else tasks.forEach(function(t){ sect.appendChild(renderTask(t)); });
@@ -1301,6 +1333,12 @@ function buildDuePop(t){
   quick.appendChild(qa("Today",todayStr())); quick.appendChild(qa("Tomorrow",addDays(todayStr(),1)));
   var clr=el('<button type="button" class="chip">Clear</button>'); clr.onclick=function(){ updateTask(t.id,{dueDate:null,dueTime:null}); }; quick.appendChild(clr);
   pop.appendChild(quick);
+  // snooze: bump from the current due date (or today when none/overdue)
+  var snBase=(t.dueDate && t.dueDate>todayStr()) ? t.dueDate : todayStr();
+  var snooze=el('<div class="row" style="gap:6px; flex-wrap:wrap"></div>');
+  snooze.appendChild(el('<span class="lbl" style="flex:0 0 auto">Snooze:</span>'));
+  snooze.appendChild(qa("+1 day",addDays(snBase,1))); snooze.appendChild(qa("+1 week",addDays(snBase,7))); snooze.appendChild(qa("Next Mon",dowDate(1,false)));
+  pop.appendChild(snooze);
   // reminder (only when a date is set)
   if(t.dueDate){
     var on=!!t.dueTime;
@@ -1411,12 +1449,12 @@ function renderTask(t){
     if(selectMode){
       // Select mode: show any note read-only (no editing) so rows keep their size and you can see what you're picking
       if(nt.trim()){
-        var flS=nt.split("\n")[0]||"(note)";
+        var flS=ckGlyphLine(nt.split("\n")[0]||"(note)");
         var prevS=el('<div class="qnote-prev" style="cursor:default"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+inlineRender(flS)+'</span>'+(nt.indexOf("\n")>=0?' <span class="more">&#8943; more</span>':'')+'</div>');
         mid.appendChild(prevS);
       }
     } else if(noteHasFmt(nt)){   // multi-line, link, or formatting -> clickable rendered preview (links open; clicking elsewhere opens the editor)
-      var fl=nt.split("\n")[0]||"(note)";
+      var fl=ckGlyphLine(nt.split("\n")[0]||"(note)");
       var multi=nt.indexOf("\n")>=0;
       var prev=el('<div class="qnote-prev" title="Click to edit (links open in a new tab)"><span style="flex:0 0 auto;display:inline-flex">'+ic('note')+'</span> <span class="qn-txt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+inlineRender(fl)+'</span>'+(multi?' <span class="more">&#8943; more</span>':'')+'</div>');
       prev.onclick=function(e){ if(e.target.closest("a")) return; e.stopPropagation(); expanded[t.id]=true; render(); };
@@ -1472,8 +1510,9 @@ function renderTask(t){
     nHead.appendChild(notesToolbar(ta, function(v){ saveNoteQuiet(t.id, v); refreshPv(v); }));
     d.appendChild(nHead); d.appendChild(ta);
     var pvLabel=el('<div class="lbl" style="margin-top:2px">Preview</div>'), npv=el('<div class="note-preview"></div>');
-    function refreshPv(val){ var has=!!(val&&val.trim()); pvLabel.style.display=has?"":"none"; npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val); }
+    function refreshPv(val){ var has=!!(val&&val.trim()); pvLabel.style.display=has?"":"none"; npv.style.display=has?"":"none"; if(has) npv.innerHTML=renderNotesHTML(val, true); }
     refreshPv(t.notes||""); ta.oninput=function(){ refreshPv(ta.value); };   // live preview as you type (saves on blur)
+    npv.onclick=function(e){ var cb=e.target.closest("input[data-ck]"); if(!cb) return; var nv=toggleNoteCk(ta.value, +cb.getAttribute("data-ck")); ta.value=nv; saveNoteQuiet(t.id, nv); refreshPv(nv); };   // tick checklist items right in the preview
     d.appendChild(pvLabel); d.appendChild(npv);
     // task ID (for reference / matching the [taskhub:id] tag in Microsoft To Do) — click to copy
     var idRow=el('<div class="muted" style="font-size:12px; margin-top:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap">Task ID: <code style="font-family:Consolas,monospace; background:'+(darkMode?"#1c1b19":"#f1f5f9")+'; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; padding:1px 6px; border-radius:6px">'+esc(t.id)+'</code></div>');
@@ -1560,7 +1599,7 @@ function renderToday(){
   qa.appendChild(qsel); qa.appendChild(qinp); qa.appendChild(qbtn); wrap.appendChild(qa);
 
   function block(title,list){ var s=el('<div class="sect"></div>'); s.appendChild(el('<div class="sect-h"><div class="left"><h2>'+title+'</h2> <span class="pill">'+list.length+'</span></div></div>')); if(list.length===0)s.appendChild(el('<div class="empty">Nothing here.</div>')); else list.forEach(function(t){ s.appendChild(renderTask(t)); }); return s; }
-  if(od.length) wrap.appendChild(block('<span style="color:'+odC()+'">Overdue</span>',od));
+  if(od.length){ var ob=block('<span style="color:'+odC()+'">Overdue</span>',od); var obh=ob.querySelector('.sect-h'); if(obh){ var mv2=el('<button class="btn" style="padding:4px 10px; font-size:12px" title="Reschedule every overdue task to today">'+ic('calplus')+' Move all to Today</button>'); mv2.onclick=moveOverdueToToday; obh.appendChild(mv2); } wrap.appendChild(ob); }
   wrap.appendChild(block('<span style="color:'+lA("today")+'">Due Today</span>',due));
   if(noDue.length) wrap.appendChild(block("No Due Date",noDue));
   // On narrow screens the right rail is hidden, so show today's calendar inline here too.
@@ -1576,7 +1615,14 @@ function renderEventRow(e){
   var sa=showAs(e.showAs);
   var ev=el('<div class="ev"></div>');
   ev.appendChild(el('<div class="time">'+(e.allDay?'<span class="muted" style="font-size:13px;font-weight:600">All day</span>':('<div style="font-size:13px;font-weight:700">'+esc(e.start||"")+'</div><div style="font-size:12px" class="muted">'+esc(e.end||"")+'</div>'))+'</div>'));
-  ev.appendChild(el('<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:500">'+esc(e.title)+'</div><div style="margin-top:2px"><span class="pill" style="background:'+sa.b+'; color:'+sa.c+'">'+sa.l+'</span>'+(e.teams?' <span style="font-size:13px;color:'+(darkMode?"#38bdf8":"#0284c7")+';font-weight:600">'+ic('video')+' Teams</span>':'')+'</div></div>'));
+  var teamsBadge='';
+  if(e.teams){
+    var tCol=darkMode?"#38bdf8":"#0284c7";
+    teamsBadge = e.join
+      ? ' <a href="'+esc(e.join)+'" target="_blank" rel="noopener noreferrer" title="Join the Teams meeting" style="font-size:13px;color:'+tCol+';font-weight:600;text-decoration:none;border:1px solid '+(darkMode?"#1e4258":"#bae6fd")+';border-radius:9999px;padding:1px 8px">'+ic('video')+' Join</a>'
+      : ' <span style="font-size:13px;color:'+tCol+';font-weight:600">'+ic('video')+' Teams</span>';
+  }
+  ev.appendChild(el('<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:500">'+esc(e.title)+'</div><div style="margin-top:2px"><span class="pill" style="background:'+sa.b+'; color:'+sa.c+'">'+sa.l+'</span>'+teamsBadge+'</div></div>'));
   return ev;
 }
 
