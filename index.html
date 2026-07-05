@@ -429,7 +429,8 @@ function ic(n,sz){ sz=sz||16; var P={
  bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
  bell:'<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
  sparkles:'<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="M18 14l.7 2.3 2.3.7-2.3.7L18 20l-.7-2.3-2.3-.7 2.3-.7z"/>',
- rows:'<path d="M3 6h18M3 12h18M3 18h18"/>'
+ rows:'<path d="M3 6h18M3 12h18M3 18h18"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>'
  };
  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:0 0 auto">'+(P[n]||"")+'</svg>';
 }
@@ -1623,6 +1624,13 @@ function renderEventRow(e){
       : ' <span style="font-size:13px;color:'+tCol+';font-weight:600">'+ic('video')+' Teams</span>';
   }
   ev.appendChild(el('<div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:500">'+esc(e.title)+'</div><div style="margin-top:2px"><span class="pill" style="background:'+sa.b+'; color:'+sa.c+'">'+sa.l+'</span>'+teamsBadge+'</div></div>'));
+  // one-click follow-up: prefilled task due the meeting day, note pointing back at the meeting
+  var fu=el('<button class="iconbtn" title="Add follow-up task for this meeting" aria-label="Add follow-up task: '+esc(e.title)+'" style="width:28px;height:28px;flex:0 0 auto">'+ic('plus',14)+'</button>');
+  fu.onclick=function(ev2){ ev2.stopPropagation();
+    var mt=(e.title||"").trim().replace(/^Declined:\s*/,"");
+    addTask("Follow up: "+mt, "work", null, "medium", e.date, null, "From meeting: "+mt+" — "+evDayLabel(e.date)+(e.start?(", "+e.start):""));
+  };
+  ev.appendChild(fu);
   return ev;
 }
 
