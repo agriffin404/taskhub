@@ -880,6 +880,7 @@ var search = "";
 var sortMode = "due";
 var sortDir = "asc";      // asc | desc
 var compact = false;      // tighter rows (toolbar toggle, persisted)
+var mobileNoteDismissed = false;   // session dismiss for the "no file access on this device" guidance
 var groupBy = "date";     // date | priority | list | none
 var expanded = {};   // task id -> bool
 var menuOpen = null; // task id for calendar menu
@@ -1104,6 +1105,17 @@ function render(){
     app.appendChild(el('<div class="warn">'+ic('alert')+' <span><b>This browser is blocking local storage.</b> Changes won\'t persist on refresh. If your browser supports it, click <b>Link all</b> above to auto-save to a JSON file in OneDrive, or use <b>Export</b> to back up.</span></div>'));
   }
   // (the "Auto-saving" confirmation now lives compactly in the toolbar's "All linked" button)
+
+  // mobile / no-file-access guidance: File System Access API is desktop-Chromium only, so phones can't link the JSON files
+  if(!fsSupported && !mobileNoteDismissed){
+    var mnote=el('<div class="warn" style="align-items:center; background:'+lS("combined")+'; border-color:'+(darkMode?"#3a3f63":"#c7d2fe")+'; color:'+lA("combined")+'"></div>');
+    mnote.appendChild(el('<span>'+ic('bell')+' <b>This device cannot link your files.</b> Live sync needs desktop Edge or Chrome. On mobile your tasks live in <b>Microsoft To&nbsp;Do</b> &mdash; use that app for the full experience. To view them here, Import a backup from OneDrive.</span>'));
+    var mrow=el('<div class="row" style="gap:6px; margin-left:auto; flex:0 0 auto"></div>');
+    var mimp=el('<button class="btn" style="padding:6px 12px">'+ic('upload')+' Import</button>'); mimp.onclick=function(){ openModal("import"); };
+    var mx=el('<button class="iconbtn" aria-label="Dismiss this notice" title="Dismiss">'+ic('x')+'</button>'); mx.onclick=function(){ mobileNoteDismissed=true; render(); };
+    mrow.appendChild(mimp); mrow.appendChild(mx); mnote.appendChild(mrow);
+    app.appendChild(mnote);
+  }
 
   // AI suggestions awaiting review (risky ops the AI agent proposed)
   if(inboxPending.length){
