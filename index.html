@@ -15,7 +15,7 @@
 <style>
   :root { --vio1:#8b5cf6; --vio2:#ec4899; --sky1:#0ea5e9; --sky2:#14b8a6; }
   * { box-sizing: border-box; }
-  body { margin:0; background:#f1f5f9; font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, Roboto, sans-serif; color:#1e293b; font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
+  body { margin:0; background:#ebeef2; font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, -apple-system, Roboto, sans-serif; color:#1e293b; font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
   .wrap { max-width: 980px; margin: 0 auto; padding: 24px 22px 72px; }
   .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
   /* two-column desktop layout: main content + sticky Today rail. Rail hidden below breakpoint. */
@@ -258,11 +258,12 @@ var PRIO = {
   medium: { label:"Medium", dot:"#f59e0b", bg:"#fffbeb", text:"#b45309", border:"#fde68a", textD:"#fbbf24", bgD:"#33290f", borderD:"#7a5c12" },
   low:    { label:"Low",    dot:"#10b981", bg:"#ecfdf5", text:"#047857", border:"#a7f3d0", textD:"#34d399", bgD:"#0f2e22", borderD:"#15573f" }
 };
+// Slate Pro: deep-slate headers with a subtle per-tab hue lean (identity kept); vivid accents stay for small cues
 var THEME = {
-  personal: { label:"Personal", grad:"linear-gradient(135deg,#8b5cf6,#ec4899)", soft:"#faf5ff", accent:"#a855f7", softD:"#2a2030", accentD:"#c084fc" },
-  work:     { label:"Work",     grad:"linear-gradient(135deg,#0ea5e9,#14b8a6)", soft:"#f0fdfa", accent:"#0ea5e9", softD:"#10262e", accentD:"#38bdf8" },
-  combined: { label:"All",      grad:"linear-gradient(135deg,#8b5cf6,#6366f1,#0ea5e9)", soft:"#eef2ff", accent:"#6366f1", softD:"#22243a", accentD:"#818cf8" },
-  today:    { label:"Today",    grad:"linear-gradient(135deg,#f59e0b,#f43f5e)", soft:"#fff7ed", accent:"#ea580c", softD:"#2e2113", accentD:"#fb923c" }
+  personal: { label:"Personal", grad:"linear-gradient(135deg,#2f3e54,#493f66)", soft:"#faf5ff", accent:"#a855f7", softD:"#2a2030", accentD:"#c084fc" },
+  work:     { label:"Work",     grad:"linear-gradient(135deg,#2f3e54,#2c5a54)", soft:"#f0fdfa", accent:"#0ea5e9", softD:"#10262e", accentD:"#38bdf8" },
+  combined: { label:"All",      grad:"linear-gradient(135deg,#2f3e54,#3d5570)", soft:"#eef2ff", accent:"#6366f1", softD:"#22243a", accentD:"#818cf8" },
+  today:    { label:"Today",    grad:"linear-gradient(135deg,#2f3e54,#5a4636)", soft:"#fff7ed", accent:"#ea580c", softD:"#2e2113", accentD:"#fb923c" }
 };
 // theme-aware accent accessors (colors are emitted inline, so pick by mode here)
 function pT(p){ var m=PRIO[p]||PRIO.medium; return darkMode?m.textD:m.text; }
