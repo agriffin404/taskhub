@@ -1615,6 +1615,7 @@ function renderToday(){
 function renderEventRow(e){
   var sa=showAs(e.showAs);
   var ev=el('<div class="ev"></div>');
+  if(e.teams){ ev.style.borderLeft="3px solid "+(darkMode?"#8b8cc7":"#6264a7"); }   // Teams brand purple accent bar for online meetings
   ev.appendChild(el('<div class="time">'+(e.allDay?'<span class="muted" style="font-size:13px;font-weight:600">All day</span>':('<div style="font-size:13px;font-weight:700">'+esc(e.start||"")+'</div><div style="font-size:12px" class="muted">'+esc(e.end||"")+'</div>'))+'</div>'));
   var teamsBadge='';
   if(e.teams){
