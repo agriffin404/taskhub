@@ -1166,7 +1166,7 @@ function renderAddBox(th){
   // clicking anywhere in the card (not on a control) focuses the title field — bigger, forgiving hit area
   box.onmousedown=function(e){ if(e.target.closest('input,textarea,select,button,a')) return; e.preventDefault(); var a=document.getElementById('addInput'); if(a)a.focus(); };
   var r=el('<div class="row"></div>');
-  var inp=el('<input id="addInput" class="titleInput" aria-label="New task title" placeholder="Add a task to '+THEME[(view==="combined")?addList:view].label+'..." style="flex:1; padding:11px 14px; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; border-radius:10px; background:'+(darkMode?"#1c1b19":"#f8fafc")+'; font-size:16px" />');
+  var inp=el('<input id="addInput" class="titleInput" aria-label="New task title" spellcheck="true" placeholder="Add a task to '+THEME[(view==="combined")?addList:view].label+'..." style="flex:1; padding:11px 14px; border:1px solid '+(darkMode?"#38332e":"#e2e8f0")+'; border-radius:10px; background:'+(darkMode?"#1c1b19":"#f8fafc")+'; font-size:16px" />');
   inp.onkeydown=function(e){ if(e.key==="Enter"){ doAdd(); } };
   var btn=el('<button class="btn btn-primary" style="background:'+th.grad+'; padding:8px 16px">Add</button>'); btn.onclick=doAdd;
   r.appendChild(inp); r.appendChild(btn); box.appendChild(r);
@@ -1202,7 +1202,7 @@ function renderAddBox(th){
   extra.appendChild(ctrls);
   syncDate();
 
-  var noteInp=el('<textarea class="field" rows="2" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; margin-top:10px; resize:vertical"></textarea>'); noteInp.value=draftNotes; noteInp.oninput=function(){ draftNotes=noteInp.value; }; extra.appendChild(noteInp);
+  var noteInp=el('<textarea class="field" rows="2" aria-label="Notes" spellcheck="true" placeholder="Notes (optional) — also used as the calendar/To Do description" style="width:100%; margin-top:10px; resize:vertical"></textarea>'); noteInp.value=draftNotes; noteInp.oninput=function(){ draftNotes=noteInp.value; }; extra.appendChild(noteInp);
   var nbar=notesToolbar(noteInp, function(v){ draftNotes=v; }); nbar.style.marginTop="8px"; extra.appendChild(nbar);
   box.appendChild(extra);
 
@@ -1238,7 +1238,7 @@ function renderSearchFilter(){
   var wrap=el('<div></div>');
   var sb=el('<div class="card row" style="margin-top:12px; padding:8px 12px"></div>');
   sb.appendChild(el('<span class="muted" aria-hidden="true" style="display:flex">'+ic('search')+'</span>'));
-  var si=el('<input id="searchInput" type="search" class="titleInput" aria-label="Search tasks" placeholder="Search tasks... (press /)" />'); si.value=search; si.oninput=function(){ search=si.value; var node=renderGroups(); var old=document.getElementById("groups"); if(old&&node){ old.replaceWith(node);} }; sb.appendChild(si); wrap.appendChild(sb);
+  var si=el('<input id="searchInput" type="search" class="titleInput" aria-label="Search tasks" spellcheck="false" placeholder="Search tasks... (press /)" />'); si.value=search; si.oninput=function(){ search=si.value; var node=renderGroups(); var old=document.getElementById("groups"); if(old&&node){ old.replaceWith(node);} }; sb.appendChild(si); wrap.appendChild(sb);
 
   var fr=el('<div class="row" style="justify-content:space-between; flex-wrap:wrap; gap:8px; margin-top:12px"></div>');
   var seg=el('<div class="seg"></div>');
@@ -1408,7 +1408,7 @@ function renderTask(t){
     }; node.appendChild(sc); }
   var cb=el('<button class="cb'+(t.completed?" done":"")+'" role="checkbox" aria-checked="'+t.completed+'" aria-label="'+(t.completed?"Mark incomplete":"Mark complete")+': '+esc(t.title)+'">'+(t.completed?"&#10003;":"")+'</button>'); cb.onclick=function(){ toggleComplete(t.id); }; node.appendChild(cb);
   var mid=el('<div style="flex:1; min-width:0"></div>');
-  var ti=el('<div class="titleInput taskTitle'+(t.completed?" done":"")+'" contenteditable="true" role="textbox" aria-multiline="false" aria-label="Task title" spellcheck="false" style="width:100%; font-weight:500"></div>'); ti.textContent=t.title;
+  var ti=el('<div class="titleInput taskTitle'+(t.completed?" done":"")+'" contenteditable="true" role="textbox" aria-multiline="false" aria-label="Task title" spellcheck="true" style="width:100%; font-weight:500"></div>'); ti.textContent=t.title;
   ti.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); ti.blur(); } };
   ti.onblur=function(){ var v=(ti.textContent||"").replace(/\s+/g," ").trim(); if(!v){ ti.textContent=t.title; return; } if(v!==t.title) updateTask(t.id,{title:v}); };
   mid.appendChild(ti);
@@ -1474,7 +1474,7 @@ function renderTask(t){
       prev.onclick=function(e){ if(e.target.closest("a")) return; e.stopPropagation(); expanded[t.id]=true; render(); };
       mid.appendChild(prev);
     } else {
-      var qn=el('<input class="qnote" aria-label="Quick note for '+esc(t.title)+'" placeholder="Add a note&hellip;" />'); qn.value=nt;
+      var qn=el('<input class="qnote" aria-label="Quick note for '+esc(t.title)+'" spellcheck="true" placeholder="Add a note&hellip;" />'); qn.value=nt;
       qn.onclick=function(e){ e.stopPropagation(); };
       qn.onkeydown=function(e){ if(e.key==="Enter"){ e.preventDefault(); qn.blur(); } else if(e.key==="Escape"){ qn.value=nt; qn.blur(); } };
       qn.onchange=function(){ saveNoteQuiet(t.id, qn.value); };   // commit without re-render so a focus-stealing click (e.g. expand) still lands
@@ -1518,7 +1518,7 @@ function renderTask(t){
     var recSel=el('<select class="field" aria-label="Repeats"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekdays">Every weekday</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Annually</option></select>'); recSel.value=t.recur||"none"; recSel.onchange=function(){ updateTask(t.id,{recur:recSel.value}); };
     var listSel2=el('<select class="field" aria-label="List"><option value="personal">Personal</option><option value="work">Work</option></select>'); listSel2.value=t.list; listSel2.onchange=function(){ updateTask(t.id,{list:listSel2.value}); };
     g3.appendChild(recSel); g3.appendChild(listSel2); d.appendChild(g3);
-    var ta=el('<textarea class="field" rows="6" aria-label="Notes" placeholder="Notes (optional) — also used as the calendar/To Do description. Tip: click Link or paste a URL" style="width:100%; min-height:140px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
+    var ta=el('<textarea class="field" rows="6" aria-label="Notes" spellcheck="true" placeholder="Notes (optional) — also used as the calendar/To Do description. Tip: click Link or paste a URL" style="width:100%; min-height:140px; resize:vertical"></textarea>'); ta.value=t.notes||""; ta.onchange=function(){ updateTask(t.id,{notes:ta.value}); };
     var nHead=el('<div class="row" style="gap:8px; align-items:center"></div>'); nHead.appendChild(el('<label class="lbl" style="margin-right:auto">Notes</label>'));
     // toolbar edits set ta.value programmatically (no change/input event fires) — commit + refresh explicitly
     nHead.appendChild(notesToolbar(ta, function(v){ saveNoteQuiet(t.id, v); refreshPv(v); }));
@@ -1606,7 +1606,7 @@ function renderToday(){
   // quick add
   var qa=el('<div class="card row" style="margin-top:12px; padding:8px"></div>');
   var qsel=el('<select class="field" aria-label="List"><option value="personal">Personal</option><option value="work">Work</option></select>'); qsel.value=addList; qsel.onchange=function(){ addList=qsel.value; };
-  var qinp=el('<input id="addInput" class="titleInput" aria-label="New task for today" placeholder="Add a task for today..." />');
+  var qinp=el('<input id="addInput" class="titleInput" aria-label="New task for today" spellcheck="true" placeholder="Add a task for today..." />');
   var qbtn=el('<button class="btn btn-primary" style="background:'+THEME.today.grad+'">Add</button>');
   function qadd(){ var v=(qinp.value||"").trim(); if(!v){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; } addTask(v, qsel.value, null, "medium", tk, null, ""); var a2=document.getElementById("addInput"); if(a2)a2.focus(); }
   qbtn.onclick=qadd; qinp.onkeydown=function(e){ if(e.key==="Enter")qadd(); };
