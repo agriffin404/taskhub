@@ -653,6 +653,8 @@ async function restoreEventsHandle(){
 function eventsList(){ return liveEvents || EVENTS_SNAPSHOT; }
 function evSyncedAt(){ return (eventsMeta && eventsMeta.syncedAt) || EVENTS_SYNCED_AT; }
 function evRangeLabel(){ return (eventsMeta && eventsMeta.rangeLabel) || EVENTS_RANGE_LABEL; }
+// time-only portion of the sync stamp ("Jul 8, 11:14 AM" -> "11:14 AM") for the compact Today's Calendar caption; falls back to the full stamp
+function evSyncedTime(){ var s=evSyncedAt()||""; var m=s.match(/\d{1,2}:\d{2}(:\d{2})?\s*[AP]M/i); return m?m[0]:s; }
 
 // ---------------- AI inbox (an AI agent writes a change-set; we ingest & merge) ----------------
 // The agent READS taskhub-data.json (current tasks + ids) and WRITES taskhub-inbox.json (ops).
@@ -1618,6 +1620,7 @@ function renderToday(){
   if(noDue.length) wrap.appendChild(block("No Due Date",noDue));
   // On narrow screens the right rail is hidden, so show today's calendar inline here too.
   var ec=el('<div class="sect rail-fallback"></div>'); ec.appendChild(el('<div class="sect-h"><div class="left"><h2><span style="color:'+lA("today")+'">Today\'s Calendar</span></h2> <span class="pill">'+evs.length+'</span></div></div>'));
+  if(liveEvents) ec.appendChild(el('<div class="muted" style="font-size:12px; margin:-4px 0 8px">'+ic('check')+' Live &middot; synced '+esc(evSyncedTime())+'</div>'));
   if(evs.length===0)ec.appendChild(el('<div class="empty">No Outlook events today.</div>'));
   else evs.forEach(function(e){ ec.appendChild(renderEventRow(e)); });
   wrap.appendChild(ec);
@@ -1655,7 +1658,7 @@ function renderTodayCalendar(){
   var evs=eventsList().filter(function(e){return e.date===tk && e.title.indexOf("Declined:")!==0;}).sort(function(a,b){ if(a.allDay!==b.allDay)return a.allDay?-1:1; return clockMin(a.start)-clockMin(b.start); });
   var card=el('<div class="card" style="overflow:hidden"></div>');
   var head=el('<div style="padding:12px 16px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
-  head.innerHTML='<div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px;color:'+lA("today")+'">Today\'s Calendar</b> <span class="pill" style="background:'+lS("today")+';color:'+lA("today")+'">'+evs.length+'</span></div><div class="muted" style="font-size:13px;margin-top:2px">'+esc(dl)+'</div>';
+  head.innerHTML='<div style="display:flex;gap:8px;align-items:center"><b style="font-size:16px;color:'+lA("today")+'">Today\'s Calendar</b> <span class="pill" style="background:'+lS("today")+';color:'+lA("today")+'">'+evs.length+'</span></div><div class="muted" style="font-size:13px;margin-top:2px">'+esc(dl)+(liveEvents?' &middot; '+ic('check')+' Live &middot; synced '+esc(evSyncedTime()):'')+'</div>';
   card.appendChild(head);
   var body=el('<div style="padding:8px 16px 12px"></div>');
   if(evs.length===0) body.appendChild(el('<div class="empty" style="padding:14px 0">No Outlook events today.</div>'));
