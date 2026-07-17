@@ -912,7 +912,22 @@ function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}
   if(typeof p.evOpen==="boolean") evOpen=p.evOpen;
 }catch(e){} }
 
-function toast(m, action){ toastMsg=m; toastAction=action||null; if(toastTimer)clearTimeout(toastTimer); render(); var dur=action?7000:3500; toastTimer=setTimeout(function(){toastMsg=null;toastAction=null;render();},dur); }
+function toast(m, action){ toastMsg=m; toastAction=action||null; if(toastTimer)clearTimeout(toastTimer); renderToast(); var dur=action?7000:3500; toastTimer=setTimeout(function(){toastMsg=null;toastAction=null;renderToast();},dur); }
+// show/hide ONLY the toast element — never rebuild the app (a full render() here would yank the user out of a field mid-edit)
+function renderToast(){
+  var app=document.getElementById("app"); if(!app) return;
+  var ex=app.querySelector(".toast"); if(ex) ex.remove();
+  if(!toastMsg) return;
+  var tt=el('<div class="toast" role="status" aria-live="polite"><div class="inner"></div></div>');
+  var inner=tt.firstElementChild;
+  inner.appendChild(document.createTextNode(toastMsg));
+  if(toastAction){
+    var ab=el('<button class="btn" style="background:transparent;border-color:#475569;color:#fff;padding:5px 10px">'+ic('undo')+' '+esc(toastAction.label)+'</button>');
+    ab.onclick=function(){ var fn=toastAction.fn; toastMsg=null; toastAction=null; if(toastTimer)clearTimeout(toastTimer); if(fn)fn(); else renderToast(); };
+    inner.appendChild(ab);
+  }
+  app.appendChild(tt);
+}
 function pushHistory(){ undoStack.push(clone(store)); if(undoStack.length>MAX_HIST) undoStack.shift(); redoStack=[]; }
 function doUndo(){ if(!undoStack.length){ toast("Nothing to undo"); return; } redoStack.push(clone(store)); if(redoStack.length>MAX_HIST) redoStack.shift(); store=undoStack.pop(); selected={}; save(); render(); }
 function doRedo(){ if(!redoStack.length){ toast("Nothing to redo"); return; } undoStack.push(clone(store)); store=redoStack.pop(); selected={}; save(); render(); }
@@ -1150,17 +1165,7 @@ function render(){
     app.appendChild(renderModal());
     setTimeout(function(){ var mod=document.querySelector(".modal"); if(mod && !mod.contains(document.activeElement)){ var f=mod.querySelector('button,[href],input,textarea,select'); if(f)f.focus(); } },0);
   }
-  if(toastMsg){
-    var tt=el('<div class="toast" role="status" aria-live="polite"><div class="inner"></div></div>');
-    var inner=tt.firstElementChild;
-    inner.appendChild(document.createTextNode(toastMsg));
-    if(toastAction){
-      var ab=el('<button class="btn" style="background:transparent;border-color:#475569;color:#fff;padding:5px 10px">'+ic('undo')+' '+esc(toastAction.label)+'</button>');
-      ab.onclick=function(){ var fn=toastAction.fn; toastMsg=null; toastAction=null; if(toastTimer)clearTimeout(toastTimer); if(fn)fn(); };
-      inner.appendChild(ab);
-    }
-    app.appendChild(tt);
-  }
+  renderToast();
 }
 
 function renderAddBox(th){
