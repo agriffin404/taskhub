@@ -296,8 +296,18 @@ var SEED = {
     { id:"t2", title:"Reply to project emails", list:"work", sectionId:"sec-inbox", priority:"high", dueDate:null, dueTime:null, notes:"", completed:false, createdAt:Date.now()-3000 }
   ],
   archive: [],
-  scratchpad: ""
+  scratchpad: "",
+  ai: { brief:{ text:"", generatedAt:"" }, requests:[] }
 };
+// normalize the AI channel (daily brief + pending agent requests) from any loaded/imported shape
+function normalizeAi(a){
+  a = (a && typeof a==="object") ? a : {};
+  var b = (a.brief && typeof a.brief==="object") ? a.brief : {};
+  return {
+    brief: { text: typeof b.text==="string"?b.text:"", generatedAt: typeof b.generatedAt==="string"?b.generatedAt:"" },
+    requests: Array.isArray(a.requests) ? a.requests.filter(function(r){ return r && typeof r==="object" && typeof r.type==="string"; }) : []
+  };
+}
 
 // ---------------- helpers ----------------
 function uid(p){ return p+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,7); }
@@ -512,6 +522,8 @@ function ic(n,sz){ sz=sz||16; var P={
  sparkles:'<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="M18 14l.7 2.3 2.3.7-2.3.7L18 20l-.7-2.3-2.3-.7 2.3-.7z"/>',
  rows:'<path d="M3 6h18M3 12h18M3 18h18"/>',
  edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+ refresh:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>',
+ wand:'<path d="M15 4V2M15 10V8M12 7h-2M20 7h-2"/><path d="M5.5 18.5 17 7l-1-1L4.5 17.5z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>'
  };
  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:0 0 auto">'+(P[n]||"")+'</svg>';
@@ -519,7 +531,7 @@ function ic(n,sz){ sz=sz||16; var P={
 
 var storageOk = true;
 function checkStorage(){ try{ localStorage.setItem("__p","1"); var ok=localStorage.getItem("__p")==="1"; localStorage.removeItem("__p"); return ok; }catch(e){ return false; } }
-function load(){ try{ var r=localStorage.getItem(STORAGE_KEY); if(!r) return clone(SEED); var p=JSON.parse(r); return { tasks:Array.isArray(p.tasks)?p.tasks:[], sections:Array.isArray(p.sections)?p.sections:[], archive:Array.isArray(p.archive)?p.archive:[], scratchpad:typeof p.scratchpad==="string"?p.scratchpad:"" }; }catch(e){ return clone(SEED); } }
+function load(){ try{ var r=localStorage.getItem(STORAGE_KEY); if(!r) return clone(SEED); var p=JSON.parse(r); return { tasks:Array.isArray(p.tasks)?p.tasks:[], sections:Array.isArray(p.sections)?p.sections:[], archive:Array.isArray(p.archive)?p.archive:[], scratchpad:typeof p.scratchpad==="string"?p.scratchpad:"", ai:normalizeAi(p.ai) }; }catch(e){ return clone(SEED); } }
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }catch(e){} if(fileHandle){ writeToFile(); } }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -749,7 +761,7 @@ var inboxDone = (function(){ try{ var a=JSON.parse(localStorage.getItem(INBOX_LE
 function saveInboxLedger(){ try{ if(inboxDone.length>1000) inboxDone=inboxDone.slice(inboxDone.length-1000); localStorage.setItem(INBOX_LEDGER_KEY, JSON.stringify(inboxDone)); }catch(e){} }
 function hashStr(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return ""+h; }
 function inboxKey(op, batchId, idx){ if(op && typeof op.opId==="string" && op.opId) return "id:"+op.opId; if(batchId) return "b:"+batchId+"#"+idx; return "h:"+hashStr(JSON.stringify(op)); }
-var SAFE_INBOX_ACTIONS = { add:1, complete:1, uncomplete:1 };
+var SAFE_INBOX_ACTIONS = { add:1, complete:1, uncomplete:1, brief:1 };
 function isSafeInboxOp(op){ return !!SAFE_INBOX_ACTIONS[op.action]; }
 function inboxPendingHas(k){ for(var i=0;i<inboxPending.length;i++){ if(inboxPending[i]._k===k) return true; } return false; }
 
@@ -777,6 +789,10 @@ function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — 
   var a=op.action;
   // the AI agent answered a per-task help request -> clear that task's pending flag (works with any action)
   if(op.aiRequestFor && typeof op.aiRequestFor==="string"){ store.tasks=store.tasks.map(function(x){ return x.id===op.aiRequestFor?Object.assign({},x,{aiRequest:null}):x; }); }
+  // the agent answered a global AI job (brief/triage/quick-add) -> clear that pending request
+  if(op.aiJobDone && typeof op.aiJobDone==="string"){ clearAiJob(op.aiJobDone); }
+  // daily planning brief: free text the agent generated from your tasks + calendar
+  if(a==="brief"){ if(!store.ai) store.ai=normalizeAi(null); store.ai.brief={ text:(typeof op.text==="string"?op.text:""), generatedAt:new Date().toISOString() }; store.ai.requests=store.ai.requests.filter(function(r){ return r.type!=="brief"; }); return {ok:true, desc:"Refreshed your daily brief"}; }
   if(a==="add"){
     var p=inboxCoerce(op.task||{});
     if(!p.title) return {ok:false, permanent:true, desc:"Add skipped (no title)"};
@@ -807,6 +823,14 @@ function processInbox(data, silent){
   var fresh=[];
   rawOps.forEach(function(op, idx){ if(!op || typeof op!=="object" || !op.action) return; var k=inboxKey(op, batchId, idx); if(inboxDone.indexOf(k)>=0) return; if(inboxPendingHas(k)) return; op._k=k; fresh.push(op); });
   if(!fresh.length){ if(!silent) toast("No new AI changes"); render(); return; }
+  // a response arriving means the agent did the work — clear the matching pending request now,
+  // even for risky ops that still await your review (so the "requested…" indicator doesn't stick)
+  var cleared=false;
+  fresh.forEach(function(op){
+    if(op.aiJobDone && typeof op.aiJobDone==="string"){ clearAiJob(op.aiJobDone); cleared=true; }
+    if(op.aiRequestFor && typeof op.aiRequestFor==="string"){ store.tasks=store.tasks.map(function(x){ return x.id===op.aiRequestFor?Object.assign({},x,{aiRequest:null}):x; }); cleared=true; }
+  });
+  if(cleared) save();
   var safe=fresh.filter(isSafeInboxOp), risky=fresh.filter(function(o){ return !isSafeInboxOp(o); });
   var applied=0, deferred=0;
   if(safe.length){
@@ -924,7 +948,7 @@ function exportJson(){
   var delIds=store.tasks.filter(function(t){return !!t.deletedAt;}).map(function(t){return t.id;});
   var archCut=Date.now()-30*86400000;
   (store.archive||[]).forEach(function(t){ if(t.archivedAt && t.archivedAt>archCut) delIds.push(t.id); });
-  return JSON.stringify({ version:SCHEMA_VERSION, exportedAt:new Date().toISOString(), timeZone:tzName(), tasks:store.tasks, sections:store.sections, archive:store.archive||[], scratchpad:store.scratchpad||"", todo:buildTodoFeed(), deletedIds:delIds }, null, 2);
+  return JSON.stringify({ version:SCHEMA_VERSION, exportedAt:new Date().toISOString(), timeZone:tzName(), tasks:store.tasks, sections:store.sections, archive:store.archive||[], scratchpad:store.scratchpad||"", ai:store.ai||normalizeAi(null), todo:buildTodoFeed(), deletedIds:delIds }, null, 2);
 }
 var TODO_SCHEMA = JSON.stringify({
   type:"object",
@@ -947,8 +971,9 @@ function doImport(text, silent){
   // archive rides along if the backup has one; otherwise keep what's already here (older files predate archiving)
   var arch = Array.isArray(parsed.archive) ? parsed.archive.filter(function(t){return t && typeof t.title==="string";}) : ((store&&store.archive)||[]);
   var scr = typeof parsed.scratchpad==="string" ? parsed.scratchpad : ((store&&store.scratchpad)||"");
+  var ai = ("ai" in parsed) ? normalizeAi(parsed.ai) : ((store&&store.ai)||normalizeAi(null));
   if(!silent) pushHistory();
-  store = { tasks:tasks, sections:secs, archive:arch, scratchpad:scr }; save();
+  store = { tasks:tasks, sections:secs, archive:arch, scratchpad:scr, ai:ai }; save();
   if(!silent) toast("Imported "+tasks.length+" task"+(tasks.length===1?"":"s")+(skipped?" - "+skipped+" skipped":""), {label:"Undo", fn:doUndo});
   return true;
 }
@@ -1101,6 +1126,63 @@ function aiRequestAuto(t, kind){
   updateTask(t.id, { aiRequest:{ kind:kind, ask:(AI_ASKS[kind]||AI_ASKS.steps).ask, status:"pending", requestedAt:new Date().toISOString() } }, "Sent to your AI agent — the answer will arrive on the next AI sync.");
 }
 function cancelAiRequest(t){ aiMenuOpen=null; updateTask(t.id, { aiRequest:null }, "AI request cancelled"); }
+
+// ---------------- global AI jobs (daily brief · triage · quick-add) ----------------
+// Requests are written into taskhub-data.json (store.ai.requests) for the agent to pick up;
+// the agent answers via the inbox (action "brief", or add/update ops carrying aiJobDone).
+function aiPush(req){ if(!store.ai) store.ai=normalizeAi(null); if(req.type==="brief"||req.type==="triage"){ store.ai.requests=store.ai.requests.filter(function(r){ return r.type!==req.type; }); } store.ai.requests.push(req); }
+function clearAiJob(id){ if(store.ai) store.ai.requests=store.ai.requests.filter(function(r){ return r.id!==id; }); }
+function aiHasPending(type){ return !!(store.ai && store.ai.requests.some(function(r){ return r.type===type; })); }
+function requestBrief(){ if(!fileHandle){ toast("Link your data file first (\"Link all\") so your AI agent can build the brief."); return; } aiPush({ id:uid("air"), type:"brief", requestedAt:new Date().toISOString() }); save(); render(); toast("Brief requested — it'll appear on the next AI sync."); }
+function requestTriage(){ if(!fileHandle){ toast("Link your data file first (\"Link all\") so your AI agent can review your tasks."); return; } aiPush({ id:uid("air"), type:"triage", requestedAt:new Date().toISOString() }); save(); render(); toast("Cleanup requested — suggestions arrive in your review queue on the next AI sync."); }
+function requestQuickAdd(text){ if(!fileHandle){ toast("Link your data file first so your AI agent can add it."); return false; } aiPush({ id:uid("air"), type:"quickadd", text:text, requestedAt:new Date().toISOString() }); save(); render(); toast("Sent to your AI agent — the task will appear on the next AI sync."); return true; }
+
+// ---------------- natural-language quick-add parser (instant, in-browser) ----------------
+var NL_MONTHS = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12,january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+var NL_DOW = {sun:0,sunday:0,mon:1,monday:1,tue:2,tues:2,tuesday:2,wed:3,weds:3,wednesday:3,thu:4,thur:4,thurs:4,thursday:4,fri:5,friday:5,sat:6,saturday:6};
+function nlTime(str){   // "2pm","2:30pm","14:00","noon","midnight" -> "HH:MM" or null
+  var m=str.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+  if(m){ var h=+m[1]%12; if(/pm/i.test(m[3]))h+=12; return pad(h)+":"+(m[2]||"00"); }
+  m=str.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/); if(m){ return pad(+m[1])+":"+m[2]; }
+  if(/\bnoon\b/i.test(str)) return "12:00";
+  if(/\bmidnight\b/i.test(str)) return "00:00";
+  return null;
+}
+function parseQuickAdd(raw){
+  var text=(raw||"").trim(), matched=[], out={ title:text, dueDate:null, dueTime:null, priority:"medium", list:addList, remind:false };
+  if(!text) return out;
+  var strip=function(re){ text=text.replace(re, function(m){ return ""; }); };
+  // priority
+  var pm=text.match(/(?:^|\s)(?:!{1,3}|\b(urgent|asap|high priority|high|important)\b)(?=\s|$)/i);
+  if(pm){ out.priority="high"; matched.push("High priority"); strip(/(?:^|\s)(?:!{1,3}|\b(?:urgent|asap|high priority|high|important)\b)(?=\s|$)/i); }
+  else { var lm=text.match(/(?:^|\s)\b(low priority|low|whenever|someday)\b(?=\s|$)/i); if(lm){ out.priority="low"; matched.push("Low priority"); strip(/(?:^|\s)\b(?:low priority|low|whenever|someday)\b(?=\s|$)/i); } }
+  // list
+  var wl=text.match(/(?:^|\s)(#work|@work|\bfor work\b)(?=\s|$)/i), pl=text.match(/(?:^|\s)(#personal|#home|@home|\bfor (?:personal|home)\b)(?=\s|$)/i);
+  if(wl){ out.list="work"; matched.push("Work"); strip(/(?:^|\s)(?:#work|@work|for work)(?=\s|$)/i); }
+  else if(pl){ out.list="personal"; matched.push("Personal"); strip(/(?:^|\s)(?:#personal|#home|@home|for (?:personal|home))(?=\s|$)/i); }
+  // time
+  var tt=nlTime(text); if(tt){ out.dueTime=tt; out.remind=true; matched.push("At "+fmtClock(tt)); strip(/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i); strip(/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/); strip(/\b(?:noon|midnight)\b/i); }
+  // dates (relative + weekday + explicit)
+  var dd=null, lab=null;
+  if(/\btoday\b/i.test(text)){ dd=todayStr(); lab="Today"; strip(/\btoday\b/i); }
+  else if(/\btonight\b/i.test(text)){ dd=todayStr(); lab="Tonight"; if(!out.dueTime){ out.dueTime="19:00"; out.remind=true; } strip(/\btonight\b/i); }
+  else if(/\btomorrow\b/i.test(text)){ dd=addDays(todayStr(),1); lab="Tomorrow"; strip(/\btomorrow\b/i); }
+  else if(/\bnext week\b/i.test(text)){ dd=addDays(todayStr(),7); lab="Next week"; strip(/\bnext week\b/i); }
+  else { var im=text.match(/\bin\s+(\d{1,3})\s+(day|days|week|weeks)\b/i); if(im){ var n=+im[1]*(/week/i.test(im[2])?7:1); dd=addDays(todayStr(),n); lab="In "+im[1]+" "+im[2]; strip(/\bin\s+\d{1,3}\s+(?:day|days|week|weeks)\b/i); } }
+  if(!dd){ var dm=text.match(/\b(next\s+)?(sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
+    if(dm){ var dow=NL_DOW[dm[2].toLowerCase()]; dd=dowDate(dow, false); if(dm[1]) dd=addDays(dd,7); lab=(dm[1]?"Next ":"")+dm[2]; strip(/\b(?:next\s+)?(?:sun|mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i); } }
+  if(!dd){ var mo=text.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+    if(mo){ var mm2=NL_MONTHS[mo[1].toLowerCase()], day=+mo[2], yr=(new Date()).getFullYear(); var cand=yr+"-"+pad(mm2)+"-"+pad(day); if(cand<todayStr()) cand=(yr+1)+"-"+pad(mm2)+"-"+pad(day); dd=cand; lab=mo[0]; strip(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\.?\s+\d{1,2}(?:st|nd|rd|th)?\b/i); } }
+  if(!dd){ var iso=text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/); if(iso){ dd=iso[0]; lab=iso[0]; strip(/\b\d{4}-\d{2}-\d{2}\b/); }
+    else { var sl=text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/); if(sl){ var y3=sl[3]?(sl[3].length===2?"20"+sl[3]:sl[3]):(""+(new Date()).getFullYear()); dd=y3+"-"+pad(+sl[1])+"-"+pad(+sl[2]); lab=sl[0]; strip(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/); } } }
+  if(dd){ out.dueDate=dd; matched.push(lab+" ("+dd+")"); }
+  // clean leftover filler + whitespace
+  text=text.replace(/\s+(on|by|due|at)\s*$/i,"").replace(/^\s*(on|by|due)\s+/i,"").replace(/\s{2,}/g," ").trim();
+  out.title=text||raw.trim();
+  out.matched=matched;
+  return out;
+}
+function fmtClock(hhmm){ if(!hhmm) return ""; var p=hhmm.split(":"), h=+p[0], ap=h<12?"AM":"PM", h12=h%12; if(h12===0)h12=12; return h12+(p[1]!=="00"?(":"+p[1]):"")+" "+ap; }
 function toggleComplete(id){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t)return; if(!t.completed && t.recur && t.recur!=="none" && t.dueDate){ pushHistory(); var nd=nextRecur(t.dueDate, t.recur); store.tasks=store.tasks.map(function(x){ return x.id===id?Object.assign({},x,{dueDate:nd}):x; }); save(); render(); toast("Repeats "+(RECUR_LABEL[t.recur]||"").toLowerCase()+" — next due "+fmtDue(nd,t.dueTime), {label:"Undo", fn:doUndo}); } else { var nowDone=!t.completed; updateTask(id,{completed:nowDone, completedAt: nowDone?Date.now():null}); } }
 function delTask(id){ pushHistory(); store.tasks=store.tasks.map(function(t){ return t.id===id?Object.assign({},t,{deletedAt:Date.now(),completed:false}):t; }); save(); render(); toast("Moved to Recently deleted", {label:"Undo", fn:doUndo}); }
 function moveToBucket(id, key){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t || bucketOf(t)===key) return; var d=bucketDate(key); var patch={dueDate:d}; if(d===null)patch.dueTime=null; var name=(BUCKETS.filter(function(b){return b.k===key;})[0]||{}).name||key; updateTask(id, patch, "Moved to "+name); }
@@ -1284,6 +1366,7 @@ function render(){
   }
   layout.appendChild(main);
   var rail=el('<div class="rail" style="margin-top:16px"></div>');
+  rail.appendChild(renderAiBrief());
   rail.appendChild(renderScratchpad());
   rail.appendChild(renderTodayCalendar());
   if(!isToday) rail.appendChild(renderEvents());
@@ -1306,6 +1389,17 @@ function renderAddBox(th){
   inp.onkeydown=function(e){ if(e.key==="Enter"){ doAdd(); } };
   var btn=el('<button class="btn btn-primary" style="background:'+th.grad+'; padding:8px 16px">Add</button>'); btn.onclick=doAdd;
   r.appendChild(inp); r.appendChild(btn); box.appendChild(r);
+  // hybrid natural-language quick-add: parse the title as you type and show what was detected
+  var qa=el('<div class="row" style="gap:6px; flex-wrap:wrap; margin-top:8px; align-items:center; display:none"></div>'); box.appendChild(qa);
+  function refreshQa(){
+    var raw=(inp.value||"").trim(), p=raw?parseQuickAdd(raw):null;
+    qa.innerHTML="";
+    if(!p || !p.matched || !p.matched.length){ qa.style.display="none"; return; }
+    qa.style.display=""; qa.appendChild(el('<span class="muted" style="font-size:12px">Detected:</span>'));
+    p.matched.forEach(function(m){ qa.appendChild(el('<span class="pill" style="background:'+lS("today")+'; color:'+lA("today")+'">'+esc(m)+'</span>')); });
+    if(fileHandle){ var aiB=el('<button type="button" class="btn" style="margin-left:auto; padding:3px 9px; font-size:12px" title="Send the whole sentence to your AI agent to parse (handles unusual phrasing)">'+ic('sparkles')+' Let AI parse</button>'); aiB.onclick=function(){ if(requestQuickAdd(raw)){ inp.value=""; refreshQa(); } }; qa.appendChild(aiB); }
+  }
+  inp.addEventListener("input", refreshQa); setTimeout(refreshQa,0);
 
   var ctrls=el('<div class="row" style="flex-wrap:wrap; gap:8px; margin-top:10px"></div>');
   var listSel=null;
@@ -1342,7 +1436,19 @@ function renderAddBox(th){
   var nbar=notesToolbar(noteInp, function(v){ draftNotes=v; }); nbar.style.marginTop="8px"; extra.appendChild(nbar);
   box.appendChild(extra);
 
-  function doAdd(){ var title=(inp.value||"").trim(); if(!title){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; } var dd=draftDate||null, tt2=(draftRemind&&draftDate)?(draftTime||"09:00"):null, pr=draftPrio, nt=draftNotes; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; addTask(title, targetList, null, pr, dd, tt2, nt); var a2=document.getElementById("addInput"); if(a2)a2.focus(); }
+  function doAdd(){
+    var raw=(inp.value||"").trim(); if(!raw){ toast("Please enter a task name"); var a=document.getElementById("addInput"); if(a)a.focus(); return; }
+    var p=parseQuickAdd(raw), title=p.title||raw, nt=draftNotes;
+    // explicit controls win; otherwise fall back to what the natural-language parser detected
+    var dd, tt2;
+    if(draftDate){ dd=draftDate; tt2=(draftRemind)?(draftTime||"09:00"):null; }
+    else if(p.dueDate){ dd=p.dueDate; tt2=(p.remind&&p.dueTime)?p.dueTime:null; }
+    else { dd=null; tt2=null; }
+    var pr=(draftPrio!=="medium")?draftPrio:p.priority;
+    var lst=(view==="combined")?p.list:view;   // p.list defaults to addList, so overriding only happens when detected
+    draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes="";
+    addTask(title, lst, null, pr, dd, tt2, nt); var a2=document.getElementById("addInput"); if(a2)a2.focus();
+  }
   return box;
 }
 
@@ -1803,6 +1909,41 @@ function renderEventRow(e){
   return ev;
 }
 
+// rail card: the daily AI planning brief + a "suggest cleanup" (triage) action. Agent-generated via the inbox.
+function briefWhen(iso){ try{ var d=new Date(iso); return d.toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"}); }catch(e){ return ""; } }
+function renderAiBrief(){
+  if(!store.ai) store.ai=normalizeAi(null);
+  var brief=store.ai.brief||{text:"",generatedAt:""}, pending=aiHasPending("brief"), triagePending=aiHasPending("triage");
+  var card=el('<div class="card" style="overflow:hidden; margin-bottom:16px"></div>');
+  var head=el('<div class="row" style="padding:11px 14px; gap:8px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
+  head.appendChild(el('<b style="font-size:15px; display:flex; align-items:center; gap:7px; color:'+lA("today")+'">'+ic('sparkles')+' AI Brief</b>'));
+  if(fileHandle){
+    var rb=el('<button class="iconbtn" style="margin-left:auto'+(pending?';color:'+lA("today"):'')+'" title="'+(pending?"Refreshing on next sync":"Refresh brief")+'" aria-label="Refresh daily brief"'+(pending?' disabled':'')+'>'+ic(pending?'clock':'refresh')+'</button>');
+    rb.onclick=function(){ requestBrief(); }; head.appendChild(rb);
+  }
+  card.appendChild(head);
+  var body=el('<div style="padding:12px 14px"></div>');
+  if(!fileHandle){
+    body.appendChild(el('<div class="muted" style="font-size:13px; line-height:1.5">Link your data file (<b>Link all</b>) to let your AI assistant build a daily plan from your tasks and calendar.</div>'));
+  } else if(brief.text && brief.text.trim()){
+    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0"></div>'); pv.innerHTML=renderNotesHTML(brief.text, false);
+    body.appendChild(pv);
+    if(brief.generatedAt) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:8px">Updated '+esc(briefWhen(brief.generatedAt))+(pending?' · refreshing…':'')+'</div>'));
+  } else if(pending){
+    body.appendChild(el('<div class="muted" style="font-size:13px; display:flex; gap:7px; align-items:center">'+ic('clock')+' Building your brief — it\'ll appear on the next AI sync.</div>'));
+  } else {
+    var em=el('<button type="button" class="btn btn-primary" style="width:100%; justify-content:center; background:'+THEME.today.grad+'">'+ic('sparkles')+' Build today\'s brief</button>');
+    em.onclick=function(){ requestBrief(); }; body.appendChild(em);
+    body.appendChild(el('<div class="muted" style="font-size:12px; margin-top:8px; text-align:center">A prioritized plan from your tasks + calendar.</div>'));
+  }
+  if(fileHandle){
+    var tr=el('<button type="button" class="btn" style="width:100%; justify-content:center; margin-top:10px"'+(triagePending?' disabled':'')+' title="Ask the AI to flag missing due dates/priorities, stale tasks, and likely duplicates — suggestions land in your review queue.">'+ic('wand')+' '+(triagePending?'Cleanup requested…':'Suggest cleanup')+'</button>');
+    if(!triagePending) tr.onclick=function(){ requestTriage(); };
+    body.appendChild(tr);
+  }
+  card.appendChild(body);
+  return card;
+}
 // sticky desktop rail: free-text Scratchpad (quick notes / project ideas). Private, autosaves, not synced to To Do.
 function renderScratchpad(){
   var sc=store.scratchpad||"";
