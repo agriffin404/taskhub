@@ -775,6 +775,8 @@ function inboxCoerce(s){   // -> validated patch containing only recognized task
 }
 function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — permanent:true = never retry this op
   var a=op.action;
+  // the AI agent answered a per-task help request -> clear that task's pending flag (works with any action)
+  if(op.aiRequestFor && typeof op.aiRequestFor==="string"){ store.tasks=store.tasks.map(function(x){ return x.id===op.aiRequestFor?Object.assign({},x,{aiRequest:null}):x; }); }
   if(a==="add"){
     var p=inboxCoerce(op.task||{});
     if(!p.title) return {ok:false, permanent:true, desc:"Add skipped (no title)"};
@@ -794,7 +796,7 @@ function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — 
     var doneAt = done ? (op.completedAt!=null ? (typeof op.completedAt==="number"?op.completedAt:(new Date(op.completedAt).getTime()||Date.now())) : Date.now()) : null;
     store.tasks=store.tasks.map(function(x){ return x.id===t.id?Object.assign({},x,{completed:done, completedAt: doneAt}):x; }); return {ok:true, desc:(done?"Completed “":"Reopened “")+t.title+"”"}; }
   if(a==="delete"){ store.tasks=store.tasks.map(function(x){ return x.id===t.id?Object.assign({},x,{deletedAt:Date.now(),completed:false}):x; }); return {ok:true, desc:"Deleted “"+t.title+"”"}; }
-  if(a==="update"||a==="reschedule"){ var patch=inboxCoerce(op.set||{}); var merged=Object.assign({},t,patch); if(!merged.dueDate) merged.dueTime=null; store.tasks=store.tasks.map(function(x){ return x.id===t.id?merged:x; }); return {ok:true, desc:(a==="reschedule"?"Rescheduled “":"Updated “")+t.title+"”"}; }
+  if(a==="update"||a==="reschedule"){ var patch=inboxCoerce(op.set||{}); var merged=Object.assign({},t,patch); if(!merged.dueDate) merged.dueTime=null; if(op.clearAiRequest) merged.aiRequest=null; store.tasks=store.tasks.map(function(x){ return x.id===t.id?merged:x; }); return {ok:true, desc:(a==="reschedule"?"Rescheduled “":"Updated “")+t.title+"”"}; }
   return {ok:false, permanent:true, desc:"Unknown action: "+a};
 }
 function processInbox(data, silent){
@@ -969,6 +971,8 @@ var scratchEditing = false;        // scratchpad rail card: rendered (glanceable
 var groupBy = "date";     // date | priority | list | none
 var expanded = {};   // task id -> bool
 var menuOpen = null; // task id for calendar menu
+var aiMenuOpen = null; // task id for the per-task "Ask AI" menu
+var aiCfg = { url:"" };  // AI agent link (e.g. your Dust agent) — stored locally in prefs, never in the repo
 var popover = null;  // {id, kind:'due'|'prio'|'note'} inline meta editor
 var modal = null;    // 'export' | 'import' | null
 var importBuf = "";
@@ -983,7 +987,7 @@ function toggleTheme(){ darkMode=!darkMode; try{ localStorage.setItem(THEME_KEY,
 
 // remember view / filters / sort across sessions
 var PREFS_KEY = "taskhub-prefs-v1";
-function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact, evOpen:evOpen })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact, evOpen:evOpen, aiAgentUrl:aiCfg.url })); }catch(e){} }
 function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}");
   if(["today","combined","work","personal"].indexOf(p.view)>=0) view=p.view;
   if(["all","active","completed"].indexOf(p.filter)>=0) filter=p.filter;
@@ -993,6 +997,7 @@ function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}
   if(["date","priority","list","none"].indexOf(p.groupBy)>=0) groupBy=p.groupBy;
   if(typeof p.compact==="boolean") compact=p.compact;
   if(typeof p.evOpen==="boolean") evOpen=p.evOpen;
+  if(typeof p.aiAgentUrl==="string") aiCfg.url=p.aiAgentUrl;
 }catch(e){} }
 
 function toast(m, action){ toastMsg=m; toastAction=action||null; if(toastTimer)clearTimeout(toastTimer); renderToast(); var dur=action?7000:3500; toastTimer=setTimeout(function(){toastMsg=null;toastAction=null;renderToast();},dur); }
@@ -1056,6 +1061,46 @@ function saveNoteQuiet(id,val){
   var ub=document.getElementById("ubtn"), rb=document.getElementById("rbtn");   // sync undo/redo affordance
   if(ub) ub.disabled=false; if(rb) rb.disabled=true;
 }
+// ---------------- per-task AI help (Dust) ----------------
+// Two delivery modes: (1) Handoff — copy a task-specific prompt and open your AI agent so you can paste it;
+// (2) Auto — write a request into the data file for your AI agent to pick up and answer via the AI inbox.
+var AI_ASKS = {
+  steps:     { label:"Break into smaller steps", ask:"Break this task into a short, ordered checklist of concrete, actionable steps. Reply with ONLY the checklist — each step on its own line starting with \"- [ ] \"." },
+  solutions: { label:"Suggest solutions / approach", ask:"Suggest 2–4 concrete, practical ways to accomplish this task. For each, give a one-line summary followed by a couple of specific pointers." }
+};
+function aiTaskContext(t){
+  var parts=["Task: "+((t.title||"").trim())];
+  if(t.dueDate) parts.push("Due: "+t.dueDate+(t.dueTime?(" "+t.dueTime):""));
+  parts.push("List: "+(t.list==="work"?"Work":"Personal")+" · Priority: "+(((PRIO[t.priority]||{}).label)||t.priority||"Medium"));
+  var n=notesToPlain(t.notes||"").trim(); if(n) parts.push("Notes / context:\n"+n);
+  return parts.join("\n");
+}
+function aiPromptText(t, kind){ var a=AI_ASKS[kind]||AI_ASKS.steps; return a.ask+"\n\n"+aiTaskContext(t); }
+function setAiAgentUrl(){
+  var cur=aiCfg.url||"";
+  var v=window.prompt("Paste the link to your AI agent (e.g. your Dust agent URL). It's stored only on this device and is opened when you use \"open in your AI\".", cur);
+  if(v===null) return false;                 // cancelled
+  v=(v||"").trim();
+  if(v && !/^https?:\/\//i.test(v)) v="https://"+v;
+  aiCfg.url=v; savePrefs();
+  toast(v?"AI agent link saved":"AI agent link cleared");
+  return true;
+}
+// Handoff: copy the prompt, then open the configured agent in a new tab so you can paste it there.
+function aiHandoff(t, kind){
+  aiMenuOpen=null;
+  var text=aiPromptText(t, kind), open=function(){ if(aiCfg.url){ try{ window.open(aiCfg.url,"_blank","noopener"); }catch(e){} } };
+  function done(){ if(aiCfg.url){ toast("Prompt copied — opening your AI agent. Paste it there, then paste the answer back into the task notes."); open(); } else { toast("Prompt copied. Paste it into your AI assistant.", {label:"Set agent link", fn:function(){ setAiAgentUrl(); }}); } render(); }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); }
+  else { try{ window.prompt("Copy this prompt for your AI assistant:", text); }catch(e){} done(); }
+}
+// Auto: record a request on the task; it's written to the data file for your AI agent to answer via the inbox.
+function aiRequestAuto(t, kind){
+  aiMenuOpen=null;
+  if(!fileHandle){ toast("Link your data file first (\"Link all\") so your AI agent can see the request."); render(); return; }
+  updateTask(t.id, { aiRequest:{ kind:kind, ask:(AI_ASKS[kind]||AI_ASKS.steps).ask, status:"pending", requestedAt:new Date().toISOString() } }, "Sent to your AI agent — the answer will arrive on the next AI sync.");
+}
+function cancelAiRequest(t){ aiMenuOpen=null; updateTask(t.id, { aiRequest:null }, "AI request cancelled"); }
 function toggleComplete(id){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t)return; if(!t.completed && t.recur && t.recur!=="none" && t.dueDate){ pushHistory(); var nd=nextRecur(t.dueDate, t.recur); store.tasks=store.tasks.map(function(x){ return x.id===id?Object.assign({},x,{dueDate:nd}):x; }); save(); render(); toast("Repeats "+(RECUR_LABEL[t.recur]||"").toLowerCase()+" — next due "+fmtDue(nd,t.dueTime), {label:"Undo", fn:doUndo}); } else { var nowDone=!t.completed; updateTask(id,{completed:nowDone, completedAt: nowDone?Date.now():null}); } }
 function delTask(id){ pushHistory(); store.tasks=store.tasks.map(function(t){ return t.id===id?Object.assign({},t,{deletedAt:Date.now(),completed:false}):t; }); save(); render(); toast("Moved to Recently deleted", {label:"Undo", fn:doUndo}); }
 function moveToBucket(id, key){ var t=store.tasks.filter(function(x){return x.id===id;})[0]; if(!t || bucketOf(t)===key) return; var d=bucketDate(key); var patch={dueDate:d}; if(d===null)patch.dueTime=null; var name=(BUCKETS.filter(function(b){return b.k===key;})[0]||{}).name||key; updateTask(id, patch, "Moved to "+name); }
@@ -1585,6 +1630,24 @@ function renderTask(t){
     menu.appendChild(b1); menu.appendChild(b2); menu.appendChild(a1); menu.appendChild(a2);
     actions.appendChild(menu);
   }
+  // Ask AI for help with this task (Dust): break into steps or suggest solutions
+  var aiPending=!!(t.aiRequest && t.aiRequest.status==="pending");
+  var aiBtn=el('<button class="iconbtn" data-aibtn="1" title="'+(aiPending?"AI help requested":"Ask AI for help")+'" aria-label="Ask AI for help with: '+esc(t.title)+'" aria-haspopup="menu" aria-expanded="'+(aiMenuOpen===t.id)+'"'+(aiPending?' style="color:'+lA("today")+'"':'')+'>'+ic('sparkles')+'</button>');
+  aiBtn.onclick=function(e){ e.stopPropagation(); popover=null; menuOpen=null; aiMenuOpen=(aiMenuOpen===t.id)?null:t.id; render(); }; actions.appendChild(aiBtn);
+  if(aiMenuOpen===t.id){
+    var am=el('<div class="menu" role="menu" style="min-width:250px"></div>');
+    if(aiPending){
+      am.appendChild(el('<div style="padding:8px 12px; font-size:12px; color:'+(darkMode?"#a5a099":"#64748b")+'">'+ic('clock')+' AI help requested ('+esc((AI_ASKS[t.aiRequest.kind]||{}).label||t.aiRequest.kind)+'). The answer arrives on your next AI sync.</div>'));
+      var cxl=el('<button role="menuitem">'+ic('trash')+' Cancel request</button>'); cxl.onclick=function(){ cancelAiRequest(t); }; am.appendChild(cxl);
+    } else {
+      am.appendChild(el('<div style="padding:7px 12px 3px; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:'+(darkMode?"#8a857e":"#94a3b8")+'">Open in your AI</div>'));
+      Object.keys(AI_ASKS).forEach(function(k){ var b=el('<button role="menuitem">'+ic('external')+' '+esc(AI_ASKS[k].label)+'</button>'); b.onclick=function(){ aiHandoff(t,k); }; am.appendChild(b); });
+      am.appendChild(el('<div style="padding:7px 12px 3px; margin-top:2px; border-top:1px solid '+(darkMode?"#38332e":"#eef0f4")+'; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:'+(darkMode?"#8a857e":"#94a3b8")+'">Send to AI agent (auto-applies)</div>'));
+      Object.keys(AI_ASKS).forEach(function(k){ var dis=!fileHandle; var b=el('<button role="menuitem"'+(dis?' disabled title="Link your data file first"':'')+'>'+ic('sparkles')+' '+esc(AI_ASKS[k].label)+'</button>'); if(!dis) b.onclick=function(){ aiRequestAuto(t,k); }; am.appendChild(b); });
+      var gear=el('<button role="menuitem" style="border-top:1px solid '+(darkMode?"#38332e":"#eef0f4")+'; font-size:12px; color:'+(darkMode?"#a5a099":"#64748b")+'">'+ic('link')+' '+(aiCfg.url?"Change":"Set")+' AI agent link&hellip;</button>'); gear.onclick=function(){ aiMenuOpen=null; setAiAgentUrl(); render(); }; am.appendChild(gear);
+    }
+    actions.appendChild(am);
+  }
   var edit=el('<button class="iconbtn" title="Details" aria-label="Toggle details for: '+esc(t.title)+'" aria-expanded="'+(!!expanded[t.id])+'">'+(expanded[t.id]?ic('chevdown'):ic('chevright'))+'</button>'); edit.onclick=function(){ expanded[t.id]=!expanded[t.id]; render(); }; actions.appendChild(edit);
   var del=el('<button class="iconbtn" title="Delete" aria-label="Delete task: '+esc(t.title)+'" style="color:#cbd5e1">'+ic('trash')+'</button>'); del.onclick=function(){ delTask(t.id); }; actions.appendChild(del);
   node.appendChild(actions);
@@ -1950,6 +2013,7 @@ function trapTab(e){
 document.addEventListener("click", function(e){
   var changed=false;
   if(menuOpen && !e.target.closest(".menu") && !e.target.closest("[data-calbtn]")){ menuOpen=null; changed=true; }
+  if(aiMenuOpen && !e.target.closest(".menu") && !e.target.closest("[data-aibtn]")){ aiMenuOpen=null; changed=true; }
   if(popover && !e.target.closest(".editpop") && !e.target.closest("[data-metachip]")){ popover=null; changed=true; }
   if(changed) render();
   // close the mobile "More" toolbar menu on outside click (no re-render needed)
@@ -1963,6 +2027,7 @@ document.addEventListener("keydown", function(e){
     if(modal){ closeModal(); return; }
     if(popover){ popover=null; render(); return; }
     if(menuOpen!==null){ menuOpen=null; render(); return; }
+    if(aiMenuOpen!==null){ aiMenuOpen=null; render(); return; }
     if(selectMode){ selectMode=false; selected={}; render(); return; }
   }
   if(modal){ if(e.key==="Tab") trapTab(e); return; }
