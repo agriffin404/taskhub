@@ -392,13 +392,22 @@ function ckGlyphLine(fl){ var m=fl.match(/^[ \t]*[-*]\s+\[( |x|X)\]\s?(.*)$/); r
 function notesToolbar(ta, after){
   var bar=el('<div class="row" style="gap:4px; flex-wrap:wrap; align-items:center"></div>');
   function mk(html, title, fn){ var b=el('<button type="button" class="btn" style="padding:4px 9px; font-size:13px; min-width:30px; justify-content:center" title="'+title+'">'+html+'</button>'); b.onmousedown=function(e){ e.preventDefault(); }; b.onclick=function(e){ e.preventDefault(); fn(); }; bar.appendChild(b); return b; }
-  mk('<b>B</b>', 'Bold — **text**', function(){ fmtWrap(ta,"**","bold text",after); });
-  mk('<i>I</i>', 'Italic — *text*', function(){ fmtWrap(ta,"*","italic text",after); });
-  mk('<u>U</u>', 'Underline — __text__', function(){ fmtWrap(ta,"__","underlined text",after); });
+  mk('<b>B</b>', 'Bold — Ctrl+B  (**text**)', function(){ fmtWrap(ta,"**","bold text",after); });
+  mk('<i>I</i>', 'Italic — Ctrl+I  (*text*)', function(){ fmtWrap(ta,"*","italic text",after); });
+  mk('<u>U</u>', 'Underline — Ctrl+U  (__text__)', function(){ fmtWrap(ta,"__","underlined text",after); });
   mk('&bull;', 'Bulleted list', function(){ fmtList(ta,"ul",after); });
   mk('1.', 'Numbered list', function(){ fmtList(ta,"ol",after); });
   mk('&#9745;', 'Checklist — tick items right from the preview', function(){ fmtList(ta,"ck",after); });
   mk(ic('link'), 'Insert hyperlink', function(){ insertLinkAtCursor(ta,after); });
+  // keyboard shortcuts on the bound textarea: Ctrl/Cmd + B / I / U
+  ta.addEventListener("keydown", function(e){
+    if((e.ctrlKey||e.metaKey) && !e.altKey){
+      var k=(e.key||"").toLowerCase();
+      if(k==="b"){ e.preventDefault(); fmtWrap(ta,"**","bold text",after); }
+      else if(k==="i"){ e.preventDefault(); fmtWrap(ta,"*","italic text",after); }
+      else if(k==="u"){ e.preventDefault(); fmtWrap(ta,"__","underlined text",after); }
+    }
+  });
   return bar;
 }
 function ic(n,sz){ sz=sz||16; var P={
@@ -1667,7 +1676,7 @@ function renderScratchpad(){
   var card=el('<div class="card" style="overflow:hidden; margin-bottom:16px"></div>');
   var head=el('<div class="row" style="padding:11px 14px; gap:8px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
   head.appendChild(el('<b style="font-size:15px; display:flex; align-items:center; gap:7px">'+ic('note')+' Scratchpad</b>'));
-  var eb=el('<button class="iconbtn" style="margin-left:auto" title="'+(scratchEditing?"Done editing":"Edit scratchpad")+'" aria-label="'+(scratchEditing?"Done editing":"Edit scratchpad")+'">'+(scratchEditing?ic('check'):ic('edit'))+'</button>');
+  var eb=el('<button class="iconbtn" style="margin-left:auto'+(scratchEditing?';color:'+(darkMode?"#34d399":"#059669"):'')+'" title="'+(scratchEditing?"Done editing":"Edit scratchpad")+'" aria-label="'+(scratchEditing?"Done editing":"Edit scratchpad")+'">'+(scratchEditing?ic('check'):ic('edit'))+'</button>');
   eb.onclick=function(){ scratchEditing=!scratchEditing; render(); };
   head.appendChild(eb); card.appendChild(head);
   var body=el('<div style="padding:10px 14px 12px"></div>');
