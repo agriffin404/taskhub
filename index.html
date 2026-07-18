@@ -298,10 +298,11 @@ function esc(s){ return (s==null?"":""+s).replace(/&/g,"&amp;").replace(/</g,"&l
 // ---------- notes: hyperlinks (Markdown [label](url) + bare URLs) ----------
 function noteHasLink(text){ return !!text && (/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/.test(text) || /https?:\/\/\S/.test(text)); }
 // does the note carry any rich formatting worth rendering (links, **bold**, __underline__, *italic*, list, newline)?
-function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
+function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\*\*\*[^*\n]+\*\*\*/.test(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
 // inline emphasis applied to ALREADY-ESCAPED text: **bold**, __underline__, *italic*
 function mdEmph(s){ return s
-  .replace(/\*{3,}/g, "**")                              // collapse accidental triple/quad asterisks (double-applied bold)
+  .replace(/\*{4,}/g, "**")                              // collapse accidental 4+ asterisks (double-applied bold)
+  .replace(/\*\*\*([^*\n]+)\*\*\*/g, "<b><i>$1</i></b>") // ***bold + italic***
   .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
   .replace(/__([^_\n]+)__/g, "<u>$1</u>")
   .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>"); }
@@ -344,7 +345,8 @@ function renderNotesHTML(raw, interactive){
 }
 function notesToPlain(raw){ return (raw==null?"":(""+raw))   // for plain-text targets (calendar): drop markers, keep readable list prefixes
   .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function(_,label,url){ return label+" ("+url+")"; })
-  .replace(/\*{3,}/g, "**")
+  .replace(/\*{4,}/g, "**")
+  .replace(/\*\*\*([^*\n]+)\*\*\*/g, "$1")
   .replace(/\*\*([^*\n]+)\*\*/g, "$1")
   .replace(/__([^_\n]+)__/g, "$1")
   .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2"); }
@@ -362,10 +364,13 @@ function fmtWrap(ta, mark, placeholder, after){
   try{ ta.focus(); }catch(e){}
   var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
   var v=ta.value, had=v.slice(s,e), ml=mark.length;
-  if(had.length>=2*ml && had.slice(0,ml)===mark && had.slice(had.length-ml)===mark){       // selection already wrapped -> toggle off
+  var star=mark==="*";   // italic shares its char with bold (**); guard so we never peel one * off a **
+  if(had.length>=2*ml && had.slice(0,ml)===mark && had.slice(had.length-ml)===mark
+     && !(star && (had.charAt(ml)==="*" || had.charAt(had.length-ml-1)==="*"))){            // selection already wrapped -> toggle off
     var inner=had.slice(ml, had.length-ml);
     ta.value=v.slice(0,s)+inner+v.slice(e); ta.setSelectionRange(s, s+inner.length);
-  } else if(v.slice(s-ml,s)===mark && v.slice(e,e+ml)===mark){                              // markers just outside selection -> toggle off
+  } else if(v.slice(s-ml,s)===mark && v.slice(e,e+ml)===mark
+     && !(star && (v.charAt(s-ml-1)==="*" || v.charAt(e+ml)==="*"))){                        // markers just outside selection -> toggle off
     ta.value=v.slice(0,s-ml)+had+v.slice(e+ml); ta.setSelectionRange(s-ml, s-ml+had.length);
   } else {                                                                                  // wrap
     var sel=had||placeholder;
