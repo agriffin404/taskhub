@@ -429,6 +429,20 @@ function fmtList(ta, kind, after){   // kind: "ul" | "ol" | "ck"
   ta.setSelectionRange(ls, ls+out.length);
   if(after) after(ta.value);
 }
+// on Enter inside a list item, continue the list (bullet/number/checklist). Empty item -> end the list. Returns true if handled.
+function continueList(ta, after){
+  if(ta.selectionStart!==ta.selectionEnd) return false;   // only for a collapsed caret
+  var v=ta.value, s=ta.selectionStart, ls=v.lastIndexOf("\n", s-1)+1, le=v.indexOf("\n", s); if(le<0) le=v.length;
+  var line=v.slice(ls, le), m, marker, content;
+  if((m=line.match(/^(\s*)([-*])\s+\[(?: |x|X)\]\s+([\s\S]*)$/))){ marker=m[1]+m[2]+" [ ] "; content=m[3]; }        // checklist
+  else if((m=line.match(/^(\s*)(\d+)\.\s+([\s\S]*)$/))){ marker=m[1]+(parseInt(m[2],10)+1)+". "; content=m[3]; }   // numbered
+  else if((m=line.match(/^(\s*)([-*])\s+([\s\S]*)$/))){ marker=m[1]+m[2]+" "; content=m[3]; }                     // bullet
+  else return false;
+  if(!content.trim()){ ta.value=v.slice(0,ls)+v.slice(le); ta.setSelectionRange(ls, ls); }                        // empty item -> drop marker, end list
+  else { ta.value=v.slice(0,s)+"\n"+marker+v.slice(s); ta.setSelectionRange(s+1+marker.length, s+1+marker.length); } // continue with next marker
+  if(after) after(ta.value);
+  return true;
+}
 // flip the Nth checkbox ([ ] <-> [x]) in the raw note text
 function toggleNoteCk(raw, idx){ var n=-1; return (""+raw).replace(/^([ \t]*[-*]\s+\[)( |x|X)(\])/gm, function(mm,a,b,c){ n++; return n===idx ? (a+(b===" "?"x":" ")+c) : mm; }); }
 // collapsed one-line previews: show a checkbox first line as a glyph instead of raw "- [ ]"
@@ -460,6 +474,8 @@ function notesToolbar(ta, after, opts){
       if(k==="b"){ e.preventDefault(); fmtWrap(ta,"**","bold text",after); }
       else if(k==="i"){ e.preventDefault(); fmtWrap(ta,"*","italic text",after); }
       else if(k==="u"){ e.preventDefault(); fmtWrap(ta,"__","underlined text",after); }
+    } else if(e.key==="Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey){
+      if(continueList(ta, after)) e.preventDefault();   // auto-continue bullet/number/checklist (Shift+Enter = plain newline)
     }
   });
   return bar;
