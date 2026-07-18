@@ -284,7 +284,8 @@ var SEED = {
     { id:"t1", title:"Review weekly goals", list:"personal", sectionId:"sec-today", priority:"medium", dueDate:null, dueTime:null, notes:"", completed:false, createdAt:Date.now()-4000 },
     { id:"t2", title:"Reply to project emails", list:"work", sectionId:"sec-inbox", priority:"high", dueDate:null, dueTime:null, notes:"", completed:false, createdAt:Date.now()-3000 }
   ],
-  archive: []
+  archive: [],
+  scratchpad: ""
 };
 
 // ---------------- helpers ----------------
@@ -431,6 +432,7 @@ function ic(n,sz){ sz=sz||16; var P={
  bell:'<path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 20a2 2 0 0 0 4 0"/>',
  sparkles:'<path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/><path d="M18 14l.7 2.3 2.3.7-2.3.7L18 20l-.7-2.3-2.3-.7 2.3-.7z"/>',
  rows:'<path d="M3 6h18M3 12h18M3 18h18"/>',
+ edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
  plus:'<path d="M12 5v14M5 12h14"/>'
  };
  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;flex:0 0 auto">'+(P[n]||"")+'</svg>';
@@ -438,7 +440,7 @@ function ic(n,sz){ sz=sz||16; var P={
 
 var storageOk = true;
 function checkStorage(){ try{ localStorage.setItem("__p","1"); var ok=localStorage.getItem("__p")==="1"; localStorage.removeItem("__p"); return ok; }catch(e){ return false; } }
-function load(){ try{ var r=localStorage.getItem(STORAGE_KEY); if(!r) return clone(SEED); var p=JSON.parse(r); return { tasks:Array.isArray(p.tasks)?p.tasks:[], sections:Array.isArray(p.sections)?p.sections:[], archive:Array.isArray(p.archive)?p.archive:[] }; }catch(e){ return clone(SEED); } }
+function load(){ try{ var r=localStorage.getItem(STORAGE_KEY); if(!r) return clone(SEED); var p=JSON.parse(r); return { tasks:Array.isArray(p.tasks)?p.tasks:[], sections:Array.isArray(p.sections)?p.sections:[], archive:Array.isArray(p.archive)?p.archive:[], scratchpad:typeof p.scratchpad==="string"?p.scratchpad:"" }; }catch(e){ return clone(SEED); } }
 function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); }catch(e){} if(fileHandle){ writeToFile(); } }
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
@@ -841,7 +843,7 @@ function exportJson(){
   var delIds=store.tasks.filter(function(t){return !!t.deletedAt;}).map(function(t){return t.id;});
   var archCut=Date.now()-30*86400000;
   (store.archive||[]).forEach(function(t){ if(t.archivedAt && t.archivedAt>archCut) delIds.push(t.id); });
-  return JSON.stringify({ version:SCHEMA_VERSION, exportedAt:new Date().toISOString(), timeZone:tzName(), tasks:store.tasks, sections:store.sections, archive:store.archive||[], todo:buildTodoFeed(), deletedIds:delIds }, null, 2);
+  return JSON.stringify({ version:SCHEMA_VERSION, exportedAt:new Date().toISOString(), timeZone:tzName(), tasks:store.tasks, sections:store.sections, archive:store.archive||[], scratchpad:store.scratchpad||"", todo:buildTodoFeed(), deletedIds:delIds }, null, 2);
 }
 var TODO_SCHEMA = JSON.stringify({
   type:"object",
@@ -863,8 +865,9 @@ function doImport(text, silent){
   (Array.isArray(parsed.tasks)?parsed.tasks:[]).forEach(function(t){ if(!t||typeof t.title!=="string"||!t.title.trim()){ skipped++; return; } var nt = Object.assign({}, t); nt.id=typeof t.id==="string"?t.id:uid("t"); nt.list=t.list==="work"?"work":"personal"; nt.sectionId=(typeof t.sectionId==="string"&&sids[t.sectionId])?t.sectionId:null; nt.priority=(t.priority==="high"||t.priority==="low"||t.priority==="medium")?t.priority:"medium"; nt.dueDate=typeof t.dueDate==="string"?t.dueDate:null; nt.dueTime=typeof t.dueTime==="string"?t.dueTime:null; nt.notes=typeof t.notes==="string"?t.notes:""; nt.completed=!!t.completed; nt.completedAt=(typeof t.completedAt==="number")?t.completedAt:null; nt.recur=(["daily","weekly","weekdays","monthly","yearly"].indexOf(t.recur)>=0)?t.recur:"none"; nt.deletedAt=typeof t.deletedAt==="number"?t.deletedAt:null; nt.createdAt=typeof t.createdAt==="number"?t.createdAt:Date.now(); tasks.push(nt); });
   // archive rides along if the backup has one; otherwise keep what's already here (older files predate archiving)
   var arch = Array.isArray(parsed.archive) ? parsed.archive.filter(function(t){return t && typeof t.title==="string";}) : ((store&&store.archive)||[]);
+  var scr = typeof parsed.scratchpad==="string" ? parsed.scratchpad : ((store&&store.scratchpad)||"");
   if(!silent) pushHistory();
-  store = { tasks:tasks, sections:secs, archive:arch }; save();
+  store = { tasks:tasks, sections:secs, archive:arch, scratchpad:scr }; save();
   if(!silent) toast("Imported "+tasks.length+" task"+(tasks.length===1?"":"s")+(skipped?" - "+skipped+" skipped":""), {label:"Undo", fn:doUndo});
   return true;
 }
@@ -883,6 +886,7 @@ var sortMode = "due";
 var sortDir = "asc";      // asc | desc
 var compact = false;      // tighter rows (toolbar toggle, persisted)
 var mobileNoteDismissed = false;   // session dismiss for the "no file access on this device" guidance
+var scratchEditing = false;        // scratchpad rail card: rendered (glanceable) vs edit mode
 var groupBy = "date";     // date | priority | list | none
 var expanded = {};   // task id -> bool
 var menuOpen = null; // task id for calendar menu
@@ -1156,6 +1160,7 @@ function render(){
   }
   layout.appendChild(main);
   var rail=el('<div class="rail" style="margin-top:16px"></div>');
+  rail.appendChild(renderScratchpad());
   rail.appendChild(renderTodayCalendar());
   if(!isToday) rail.appendChild(renderEvents());
   layout.appendChild(rail);
@@ -1654,6 +1659,35 @@ function renderEventRow(e){
   };
   ev.appendChild(fu);
   return ev;
+}
+
+// sticky desktop rail: free-text Scratchpad (quick notes / project ideas). Private, autosaves, not synced to To Do.
+function renderScratchpad(){
+  var sc=store.scratchpad||"";
+  var card=el('<div class="card" style="overflow:hidden; margin-bottom:16px"></div>');
+  var head=el('<div class="row" style="padding:11px 14px; gap:8px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
+  head.appendChild(el('<b style="font-size:15px; display:flex; align-items:center; gap:7px">'+ic('note')+' Scratchpad</b>'));
+  var eb=el('<button class="iconbtn" style="margin-left:auto" title="'+(scratchEditing?"Done editing":"Edit scratchpad")+'" aria-label="'+(scratchEditing?"Done editing":"Edit scratchpad")+'">'+(scratchEditing?ic('check'):ic('edit'))+'</button>');
+  eb.onclick=function(){ scratchEditing=!scratchEditing; render(); };
+  head.appendChild(eb); card.appendChild(head);
+  var body=el('<div style="padding:10px 14px 12px"></div>');
+  if(scratchEditing){
+    var ta=el('<textarea class="field" aria-label="Scratchpad" spellcheck="true" placeholder="Jot quick notes or project ideas&hellip;" style="width:100%; min-height:130px; resize:vertical"></textarea>'); ta.value=sc;
+    ta.oninput=function(){ store.scratchpad=ta.value; save(); };   // quiet persist as you type — never re-render (would drop focus)
+    var bar=notesToolbar(ta, function(v){ store.scratchpad=v; save(); }); bar.style.marginBottom="8px";
+    body.appendChild(bar); body.appendChild(ta);
+    setTimeout(function(){ try{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }catch(e){} },0);
+  } else if(sc.trim()){
+    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0; cursor:text"></div>'); pv.innerHTML=renderNotesHTML(sc, true);
+    pv.onclick=function(e){ var cb=e.target.closest("input[data-ck]"); if(cb){ store.scratchpad=toggleNoteCk(store.scratchpad, +cb.getAttribute("data-ck")); save(); render(); return; } if(e.target.closest("a")) return; scratchEditing=true; render(); };
+    body.appendChild(pv);
+  } else {
+    var empty=el('<button type="button" class="qnote-prev" style="width:100%; cursor:text; color:'+(darkMode?"#6b6660":"#94a3b8")+'">'+ic('note')+' Jot quick notes or project ideas&hellip;</button>');
+    empty.onclick=function(){ scratchEditing=true; render(); };
+    body.appendChild(empty);
+  }
+  card.appendChild(body);
+  return card;
 }
 
 // sticky desktop rail: today's Outlook calendar, always expanded
