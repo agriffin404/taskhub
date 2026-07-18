@@ -258,6 +258,17 @@ var PRIO = {
   medium: { label:"Medium", dot:"#f59e0b", bg:"#fffbeb", text:"#b45309", border:"#fde68a", textD:"#fbbf24", bgD:"#33290f", borderD:"#7a5c12" },
   low:    { label:"Low",    dot:"#10b981", bg:"#ecfdf5", text:"#047857", border:"#a7f3d0", textD:"#34d399", bgD:"#0f2e22", borderD:"#15573f" }
 };
+// scratchpad text colors — a fixed, safe palette (light/dark tuned). "orange" matches Medium priority.
+var TEXT_COLORS = [
+  { name:"orange", label:"Orange", light:"#b45309", dark:"#fbbf24" },
+  { name:"red",    label:"Red",    light:"#dc2626", dark:"#f87171" },
+  { name:"green",  label:"Green",  light:"#15803d", dark:"#4ade80" },
+  { name:"blue",   label:"Blue",   light:"#1d4ed8", dark:"#60a5fa" },
+  { name:"purple", label:"Purple", light:"#7c3aed", dark:"#c084fc" },
+  { name:"pink",   label:"Pink",   light:"#db2777", dark:"#f472b6" }
+];
+var TC_MAP = {}; TEXT_COLORS.forEach(function(c){ TC_MAP[c.name]=c; });
+function tcHex(name){ var c=TC_MAP[name]; return c?(darkMode?c.dark:c.light):null; }
 // Slate Pro: deep-slate headers with a subtle per-tab hue lean (identity kept); vivid accents stay for small cues
 var THEME = {
   personal: { label:"Personal", grad:"linear-gradient(135deg,#2f3e54,#493f66)", soft:"#faf5ff", accent:"#a855f7", softD:"#2a2030", accentD:"#c084fc" },
@@ -298,14 +309,15 @@ function esc(s){ return (s==null?"":""+s).replace(/&/g,"&amp;").replace(/</g,"&l
 // ---------- notes: hyperlinks (Markdown [label](url) + bare URLs) ----------
 function noteHasLink(text){ return !!text && (/\[[^\]]+\]\(https?:\/\/[^\s)]+\)/.test(text) || /https?:\/\/\S/.test(text)); }
 // does the note carry any rich formatting worth rendering (links, **bold**, __underline__, *italic*, list, newline)?
-function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\*\*\*[^*\n]+\*\*\*/.test(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
+function noteHasFmt(text){ if(!text) return false; return /\n/.test(text) || noteHasLink(text) || /\{c:[a-z]+\|/.test(text) || /\*\*\*[^*\n]+\*\*\*/.test(text) || /\*\*[^*\n]+\*\*/.test(text) || /__[^_\n]+__/.test(text) || /(^|[^*])\*[^*\n]+\*/.test(text) || /^[ \t]*([-*]\s+|\d+\.\s+)/m.test(text); }
 // inline emphasis applied to ALREADY-ESCAPED text: **bold**, __underline__, *italic*
 function mdEmph(s){ return s
   .replace(/\*{4,}/g, "**")                              // collapse accidental 4+ asterisks (double-applied bold)
   .replace(/\*\*\*([^*\n]+)\*\*\*/g, "<b><i>$1</i></b>") // ***bold + italic***
   .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
   .replace(/__([^_\n]+)__/g, "<u>$1</u>")
-  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>"); }
+  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1<i>$2</i>")
+  .replace(/\{c:([a-z]+)\|([^{}]*)\}/g, function(m,name,inner){ var hex=tcHex(name); return hex?'<span style="color:'+hex+'">'+inner+'</span>':inner; }); }  // {c:name|text} colored run (safe: fixed palette)
 // render ONE line (links + bare URLs + inline emphasis); everything escaped, no <br>/lists
 function inlineRender(raw){
   raw=(raw==null?"":(""+raw));
@@ -349,7 +361,8 @@ function notesToPlain(raw){ return (raw==null?"":(""+raw))   // for plain-text t
   .replace(/\*\*\*([^*\n]+)\*\*\*/g, "$1")
   .replace(/\*\*([^*\n]+)\*\*/g, "$1")
   .replace(/__([^_\n]+)__/g, "$1")
-  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2"); }
+  .replace(/(^|[^*])\*(?!\s)([^*\n]+?)\*(?!\*)/g, "$1$2")
+  .replace(/\{c:[a-z]+\|([^{}]*)\}/g, "$1"); }   // drop color markers, keep the text
 function insertLinkAtCursor(ta, after){   // inserts [text](https://) at the caret; selects a placeholder for quick typing
   try{ ta.focus(); }catch(e){}
   var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
@@ -378,6 +391,33 @@ function fmtWrap(ta, mark, placeholder, after){
   }
   if(after) after(ta.value);
 }
+// wrap the selection in a color marker {c:name|...}; re-click same color toggles off, a different color recolors
+function fmtColor(ta, name, after){
+  try{ ta.focus(); }catch(e){}
+  var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ s=ta.value.length; e=s; }
+  var v=ta.value, had=v.slice(s,e), full=had.match(/^\{c:([a-z]+)\|([\s\S]*)\}$/), pre=v.slice(0,s).match(/\{c:([a-z]+)\|$/);
+  function set(str,ns,nlen){ ta.value=str; ta.setSelectionRange(ns, ns+nlen); }
+  if(full){                                                                    // whole color span selected -> toggle off / recolor
+    if(full[1]===name) set(v.slice(0,s)+full[2]+v.slice(e), s, full[2].length);
+    else { var r="{c:"+name+"|"+full[2]+"}"; set(v.slice(0,s)+r+v.slice(e), s, r.length); }
+  } else if(pre && v.charAt(e)==="}"){                                          // caret inside a color span (inner text selected)
+    var ps=s-pre[0].length;
+    if(pre[1]===name) set(v.slice(0,ps)+had+v.slice(e+1), ps, had.length);      // strip -> plain
+    else { var r2="{c:"+name+"|"+had+"}"; set(v.slice(0,ps)+r2+v.slice(e+1), ps, r2.length); }  // recolor
+  } else {                                                                      // wrap fresh
+    var sel=had||"colored text", w="{c:"+name+"|"+sel+"}", inS=s+3+name.length+1;
+    set(v.slice(0,s)+w+v.slice(e), inS, sel.length);
+  }
+  if(after) after(ta.value);
+}
+// remove any color markers within the selection, keeping the text
+function fmtClearColor(ta, after){
+  try{ ta.focus(); }catch(e){}
+  var s=ta.selectionStart, e=ta.selectionEnd; if(s==null){ return; }
+  var v=ta.value, had=v.slice(s,e), stripped=had.replace(/\{c:[a-z]+\|([^{}]*)\}/g,"$1");
+  ta.value=v.slice(0,s)+stripped+v.slice(e); ta.setSelectionRange(s, s+stripped.length);
+  if(after) after(ta.value);
+}
 // turn the selected line(s) into a bulleted, numbered, or checklist list (re-numbers; converts existing markers)
 function fmtList(ta, kind, after){   // kind: "ul" | "ol" | "ck"
   try{ ta.focus(); }catch(e){}
@@ -393,8 +433,8 @@ function fmtList(ta, kind, after){   // kind: "ul" | "ol" | "ck"
 function toggleNoteCk(raw, idx){ var n=-1; return (""+raw).replace(/^([ \t]*[-*]\s+\[)( |x|X)(\])/gm, function(mm,a,b,c){ n++; return n===idx ? (a+(b===" "?"x":" ")+c) : mm; }); }
 // collapsed one-line previews: show a checkbox first line as a glyph instead of raw "- [ ]"
 function ckGlyphLine(fl){ var m=fl.match(/^[ \t]*[-*]\s+\[( |x|X)\]\s?(.*)$/); return m ? ((m[1]===" "?"☐ ":"☑ ")+m[2]) : fl; }
-// a compact formatting toolbar bound to a textarea (Bold/Italic/Underline/lists/link)
-function notesToolbar(ta, after){
+// a compact formatting toolbar bound to a textarea (Bold/Italic/Underline/lists/link). opts.color adds text-color swatches.
+function notesToolbar(ta, after, opts){
   var bar=el('<div class="row" style="gap:4px; flex-wrap:wrap; align-items:center"></div>');
   function mk(html, title, fn){ var b=el('<button type="button" class="btn" style="padding:4px 9px; font-size:13px; min-width:30px; justify-content:center" title="'+title+'">'+html+'</button>'); b.onmousedown=function(e){ e.preventDefault(); }; b.onclick=function(e){ e.preventDefault(); fn(); }; bar.appendChild(b); return b; }
   mk('<b>B</b>', 'Bold — Ctrl+B  (**text**)', function(){ fmtWrap(ta,"**","bold text",after); });
@@ -404,6 +444,15 @@ function notesToolbar(ta, after){
   mk('1.', 'Numbered list', function(){ fmtList(ta,"ol",after); });
   mk('&#9745;', 'Checklist — tick items right from the preview', function(){ fmtList(ta,"ck",after); });
   mk(ic('link'), 'Insert hyperlink', function(){ insertLinkAtCursor(ta,after); });
+  if(opts && opts.color){   // text-color swatches: highlight text, click a color (click same color again to clear)
+    bar.appendChild(el('<span aria-hidden="true" style="width:1px; height:20px; background:'+(darkMode?"#38332e":"#e2e8f0")+'; margin:0 3px"></span>'));
+    TEXT_COLORS.forEach(function(tc){
+      var sw=el('<button type="button" class="btn" title="'+tc.label+' text" aria-label="'+tc.label+' text" style="padding:0; width:24px; min-width:24px; height:26px; display:inline-flex; align-items:center; justify-content:center"><span style="width:14px; height:14px; border-radius:50%; background:'+(darkMode?tc.dark:tc.light)+'; box-shadow:0 0 0 1px rgba(0,0,0,.12) inset"></span></button>');
+      sw.onmousedown=function(e){ e.preventDefault(); }; sw.onclick=function(e){ e.preventDefault(); fmtColor(ta, tc.name, after); };
+      bar.appendChild(sw);
+    });
+    mk('&#10005;', 'Remove color from selection', function(){ fmtClearColor(ta,after); });
+  }
   // keyboard shortcuts on the bound textarea: Ctrl/Cmd + B / I / U
   ta.addEventListener("keydown", function(e){
     if((e.ctrlKey||e.metaKey) && !e.altKey){
@@ -1685,14 +1734,15 @@ function renderScratchpad(){
   eb.onclick=function(){ scratchEditing=!scratchEditing; render(); };
   head.appendChild(eb); card.appendChild(head);
   var body=el('<div style="padding:10px 14px 12px"></div>');
+  var scOrange=pT("medium");   // default scratchpad text uses the Medium-priority orange so it stands out
   if(scratchEditing){
-    var ta=el('<textarea class="field" aria-label="Scratchpad" spellcheck="true" placeholder="Jot quick notes or project ideas&hellip;" style="width:100%; min-height:130px; resize:vertical"></textarea>'); ta.value=sc;
+    var ta=el('<textarea class="field" aria-label="Scratchpad" spellcheck="true" placeholder="Jot quick notes or project ideas&hellip;" style="width:100%; min-height:130px; resize:vertical; color:'+scOrange+'; font-weight:500"></textarea>'); ta.value=sc;
     ta.oninput=function(){ store.scratchpad=ta.value; save(); };   // quiet persist as you type — never re-render (would drop focus)
-    var bar=notesToolbar(ta, function(v){ store.scratchpad=v; save(); }); bar.style.marginBottom="8px";
+    var bar=notesToolbar(ta, function(v){ store.scratchpad=v; save(); }, {color:true}); bar.style.marginBottom="8px";
     body.appendChild(bar); body.appendChild(ta);
     setTimeout(function(){ try{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }catch(e){} },0);
   } else if(sc.trim()){
-    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0; cursor:text"></div>'); pv.innerHTML=renderNotesHTML(sc, true);
+    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0; cursor:text; color:'+scOrange+'; font-weight:500"></div>'); pv.innerHTML=renderNotesHTML(sc, true);
     pv.onclick=function(e){ var cb=e.target.closest("input[data-ck]"); if(cb){ store.scratchpad=toggleNoteCk(store.scratchpad, +cb.getAttribute("data-ck")); save(); render(); return; } if(e.target.closest("a")) return; scratchEditing=true; render(); };
     body.appendChild(pv);
   } else {
