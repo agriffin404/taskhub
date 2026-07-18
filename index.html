@@ -972,7 +972,7 @@ var groupBy = "date";     // date | priority | list | none
 var expanded = {};   // task id -> bool
 var menuOpen = null; // task id for calendar menu
 var aiMenuOpen = null; // task id for the per-task "Ask AI" menu
-var aiCfg = { url:"" };  // AI agent link (e.g. your Dust agent) — stored locally in prefs, never in the repo
+var aiCfg = { url:"" };  // AI agent link (your assistant's URL) — stored locally in prefs, never in the repo
 var popover = null;  // {id, kind:'due'|'prio'|'note'} inline meta editor
 var modal = null;    // 'export' | 'import' | null
 var importBuf = "";
@@ -1061,7 +1061,7 @@ function saveNoteQuiet(id,val){
   var ub=document.getElementById("ubtn"), rb=document.getElementById("rbtn");   // sync undo/redo affordance
   if(ub) ub.disabled=false; if(rb) rb.disabled=true;
 }
-// ---------------- per-task AI help (Dust) ----------------
+// ---------------- per-task AI help ----------------
 // Two delivery modes: (1) Handoff — copy a task-specific prompt and open your AI agent so you can paste it;
 // (2) Auto — write a request into the data file for your AI agent to pick up and answer via the AI inbox.
 var AI_ASKS = {
@@ -1078,7 +1078,7 @@ function aiTaskContext(t){
 function aiPromptText(t, kind){ var a=AI_ASKS[kind]||AI_ASKS.steps; return a.ask+"\n\n"+aiTaskContext(t); }
 function setAiAgentUrl(){
   var cur=aiCfg.url||"";
-  var v=window.prompt("Paste the link to your AI agent (e.g. your Dust agent URL). It's stored only on this device and is opened when you use \"open in your AI\".", cur);
+  var v=window.prompt("Paste the link to your AI assistant. It's stored only on this device and is opened when you use \"open in your AI\".", cur);
   if(v===null) return false;                 // cancelled
   v=(v||"").trim();
   if(v && !/^https?:\/\//i.test(v)) v="https://"+v;
@@ -1630,7 +1630,7 @@ function renderTask(t){
     menu.appendChild(b1); menu.appendChild(b2); menu.appendChild(a1); menu.appendChild(a2);
     actions.appendChild(menu);
   }
-  // Ask AI for help with this task (Dust): break into steps or suggest solutions
+  // Ask AI for help with this task: break into steps or suggest solutions
   var aiPending=!!(t.aiRequest && t.aiRequest.status==="pending");
   var aiBtn=el('<button class="iconbtn" data-aibtn="1" title="'+(aiPending?"AI help requested":"Ask AI for help")+'" aria-label="Ask AI for help with: '+esc(t.title)+'" aria-haspopup="menu" aria-expanded="'+(aiMenuOpen===t.id)+'"'+(aiPending?' style="color:'+lA("today")+'"':'')+'>'+ic('sparkles')+'</button>');
   aiBtn.onclick=function(e){ e.stopPropagation(); popover=null; menuOpen=null; aiMenuOpen=(aiMenuOpen===t.id)?null:t.id; render(); }; actions.appendChild(aiBtn);
