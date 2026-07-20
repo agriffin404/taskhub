@@ -638,16 +638,18 @@ async function linkAll(){
       var h=hs[i]; var nm=(h.name||"").toLowerCase();
       if(nm.indexOf("event")>=0){ eventsHandle=h; eventsNeedsReconnect=false; await idbHandle("put","events",h); got.push("events"); }
       else if(nm.indexOf("inbox")>=0){ inboxHandle=h; inboxNeedsReconnect=false; await idbHandle("put","inbox",h); got.push("AI inbox"); }
+      else if(nm.indexOf("brief")>=0){ briefHandle=h; briefNeedsReconnect=false; await idbHandle("put","brief",h); got.push("brief"); }
       else { fileHandle=h; dataNeedsPermission=false; await idbHandle("put","data",h); got.push("data"); }
     }
     if(got.indexOf("data")>=0){ await linkDataHandle(); }
     if(eventsHandle && got.indexOf("events")>=0) await readEvents(true);
     if(inboxHandle && got.indexOf("AI inbox")>=0) await readInbox(true);
+    if(briefHandle && got.indexOf("brief")>=0) await readBrief(true);
     toast(got.length?("Linked "+got.join(" + ")):"No files selected - pick your taskhub-*.json files");
   }catch(e){ /* cancelled */ }
   render();
 }
-function rcNeeded(){ return fsSupported && ((fileHandle&&dataNeedsPermission)||(eventsHandle&&eventsNeedsReconnect)||(inboxHandle&&inboxNeedsReconnect)); }
+function rcNeeded(){ return fsSupported && ((fileHandle&&dataNeedsPermission)||(eventsHandle&&eventsNeedsReconnect)||(inboxHandle&&inboxNeedsReconnect)||(briefHandle&&briefNeedsReconnect)); }
 async function reconnectAll(){
   var done=[];
   // data first (it needs the readwrite grant). Each requestPermission needs a fresh user gesture,
@@ -655,6 +657,7 @@ async function reconnectAll(){
   if(fileHandle && dataNeedsPermission){ if(await ensurePerm(fileHandle,"readwrite")){ dataNeedsPermission=false; await writeToFile(); done.push("auto-save"); } }
   if(eventsHandle && eventsNeedsReconnect){ await readEvents(true); if(!eventsNeedsReconnect) done.push("events"); }
   if(inboxHandle && inboxNeedsReconnect){ await readInbox(true); if(!inboxNeedsReconnect) done.push("AI inbox"); }
+  if(briefHandle && briefNeedsReconnect){ await readBrief(true); if(!briefNeedsReconnect) done.push("brief"); }
   if(done.length && rcNeeded()) toast("Reconnected "+done.join(" + ")+" — tap Reconnect all again to finish the rest");
   else if(done.length) toast("Reconnected "+done.join(" + "));
   else toast("Nothing needed reconnecting");
@@ -666,6 +669,8 @@ var eventsHandle = null;     // FileSystemFileHandle for taskhub-events.json (re
 var liveEvents = null;       // parsed events from the file (null = use baked snapshot)
 var eventsMeta = null;       // {syncedAt, rangeLabel} from the file
 var eventsNeedsReconnect = false;
+var briefHandle = null;      // FileSystemFileHandle for taskhub-brief.json (read) — dedicated daily-brief file
+var briefNeedsReconnect = false;
 
 function idbHandle(method, key, val){
   return new Promise(function(res){
@@ -743,6 +748,35 @@ async function restoreEventsHandle(){
   var h=await idbHandle("get", "events"); if(!h || typeof h.queryPermission!=="function" || typeof h.getFile!=="function") return; eventsHandle=h;
   try{ if((await h.queryPermission({mode:"read"}))==="granted"){ await readEvents(true); } else { eventsNeedsReconnect=true; render(); } }catch(e){}
 }
+// dedicated daily-brief file (the scheduled AI prompt overwrites it; we read it straight into store.ai.brief)
+function parseBriefPayload(txt){
+  var p=parseJSONsafe(txt); if(!p||typeof p!=="object") return null;
+  var b=(p.brief&&typeof p.brief==="object")?p.brief:p;   // accept {text,generatedAt} or {brief:{…}}
+  var text=(typeof b.text==="string")?b.text:"";
+  if(!text.trim()) return null;
+  return { text:text, generatedAt:(typeof b.generatedAt==="string")?b.generatedAt:"" };
+}
+async function readBrief(silent){
+  if(!briefHandle) return;
+  try{
+    if(!(await ensurePerm(briefHandle,"read"))){ briefNeedsReconnect=true; render(); return; }
+    var f=await briefHandle.getFile(); var txt=await f.text();
+    briefNeedsReconnect=false;
+    var b=parseBriefPayload(txt);
+    if(!b){ if(!silent) toast("Brief file is empty or not valid"); render(); return; }
+    if(!store.ai) store.ai=normalizeAi(null);
+    store.ai.brief={ text:b.text, generatedAt:b.generatedAt || new Date(f.lastModified).toISOString() };
+    store.ai.requests=store.ai.requests.filter(function(r){ return r.type!=="brief"; });   // pulling the latest satisfies any pending request
+    save(); render();
+    if(!silent) toast("Brief updated");
+  }catch(e){ if(!silent) toast("Could not read brief file"); }
+}
+async function restoreBriefHandle(){
+  if(!fsSupported) return;
+  var h=await idbHandle("get", "brief"); if(!h || typeof h.queryPermission!=="function" || typeof h.getFile!=="function") return; briefHandle=h;
+  try{ if((await h.queryPermission({mode:"read"}))==="granted"){ await readBrief(true); } else { briefNeedsReconnect=true; render(); } }catch(e){}
+}
+function refreshBrief(){ if(briefHandle){ readBrief(false); } else if(fileHandle){ requestBrief(); } else { toast("Link your taskhub-brief.json (or data file) first."); } }
 function eventsList(){ return liveEvents || EVENTS_SNAPSHOT; }
 function evSyncedAt(){ return (eventsMeta && eventsMeta.syncedAt) || EVENTS_SYNCED_AT; }
 function evRangeLabel(){ return (eventsMeta && eventsMeta.rangeLabel) || EVENTS_RANGE_LABEL; }
@@ -1914,27 +1948,30 @@ function briefWhen(iso){ try{ var d=new Date(iso); return d.toLocaleString(undef
 function renderAiBrief(){
   if(!store.ai) store.ai=normalizeAi(null);
   var brief=store.ai.brief||{text:"",generatedAt:""}, pending=aiHasPending("brief"), triagePending=aiHasPending("triage");
+  var canBrief=!!(briefHandle||fileHandle), hasBrief=!!(brief.text&&brief.text.trim());
   var card=el('<div class="card" style="overflow:hidden; margin-bottom:16px"></div>');
   var head=el('<div class="row" style="padding:11px 14px; gap:8px; border-bottom:1px solid '+(darkMode?"#38332e":"#eef0f4")+'"></div>');
   head.appendChild(el('<b style="font-size:15px; display:flex; align-items:center; gap:7px; color:'+lA("today")+'">'+ic('sparkles')+' AI Brief</b>'));
-  if(fileHandle){
-    var rb=el('<button class="iconbtn" style="margin-left:auto'+(pending?';color:'+lA("today"):'')+'" title="'+(pending?"Refreshing on next sync":"Refresh brief")+'" aria-label="Refresh daily brief"'+(pending?' disabled':'')+'>'+ic(pending?'clock':'refresh')+'</button>');
-    rb.onclick=function(){ requestBrief(); }; head.appendChild(rb);
+  if(canBrief){
+    var title=briefHandle?"Pull the latest brief from taskhub-brief.json":(pending?"Requested — arrives on next AI sync":"Ask your AI agent for a fresh brief");
+    var rb=el('<button class="iconbtn" style="margin-left:auto'+(pending?';color:'+lA("today"):'')+'" title="'+title+'" aria-label="Refresh daily brief"'+(pending&&!briefHandle?' disabled':'')+'>'+ic((pending&&!briefHandle)?'clock':'refresh')+'</button>');
+    rb.onclick=function(){ refreshBrief(); }; head.appendChild(rb);
   }
   card.appendChild(head);
   var body=el('<div style="padding:12px 14px"></div>');
-  if(!fileHandle){
-    body.appendChild(el('<div class="muted" style="font-size:13px; line-height:1.5">Link your data file (<b>Link all</b>) to let your AI assistant build a daily plan from your tasks and calendar.</div>'));
-  } else if(brief.text && brief.text.trim()){
+  if(hasBrief){
     var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0"></div>'); pv.innerHTML=renderNotesHTML(brief.text, false);
     body.appendChild(pv);
-    if(brief.generatedAt) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:8px">Updated '+esc(briefWhen(brief.generatedAt))+(pending?' · refreshing…':'')+'</div>'));
-  } else if(pending){
+    if(brief.generatedAt) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:8px">Updated '+esc(briefWhen(brief.generatedAt))+((pending&&!briefHandle)?' · refreshing…':'')+'</div>'));
+    if(briefNeedsReconnect) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:4px">Brief file needs reconnecting — use <b>Reconnect all</b>.</div>'));
+  } else if(!canBrief){
+    body.appendChild(el('<div class="muted" style="font-size:13px; line-height:1.5">Link your files (<b>Link all</b>) — include <b>taskhub-brief.json</b> — so your AI assistant\'s daily plan shows here.</div>'));
+  } else if(pending&&!briefHandle){
     body.appendChild(el('<div class="muted" style="font-size:13px; display:flex; gap:7px; align-items:center">'+ic('clock')+' Building your brief — it\'ll appear on the next AI sync.</div>'));
   } else {
-    var em=el('<button type="button" class="btn btn-primary" style="width:100%; justify-content:center; background:'+THEME.today.grad+'">'+ic('sparkles')+' Build today\'s brief</button>');
-    em.onclick=function(){ requestBrief(); }; body.appendChild(em);
-    body.appendChild(el('<div class="muted" style="font-size:12px; margin-top:8px; text-align:center">A prioritized plan from your tasks + calendar.</div>'));
+    var em=el('<button type="button" class="btn btn-primary" style="width:100%; justify-content:center; background:'+THEME.today.grad+'">'+ic('sparkles')+' '+(briefHandle?'Check for today\'s brief':'Build today\'s brief')+'</button>');
+    em.onclick=function(){ refreshBrief(); }; body.appendChild(em);
+    body.appendChild(el('<div class="muted" style="font-size:12px; margin-top:8px; text-align:center">'+(briefHandle?'Your scheduled AI brief lands in taskhub-brief.json.':'A prioritized plan from your tasks + calendar.')+'</div>'));
   }
   if(fileHandle){
     var tr=el('<button type="button" class="btn" style="width:100%; justify-content:center; margin-top:10px"'+(triagePending?' disabled':'')+' title="Ask the AI to flag missing due dates/priorities, stale tasks, and likely duplicates — suggestions land in your review queue.">'+ic('wand')+' '+(triagePending?'Cleanup requested…':'Suggest cleanup')+'</button>');
@@ -2193,6 +2230,7 @@ render();
 restoreDataHandle();
 restoreEventsHandle();
 restoreInboxHandle();
+restoreBriefHandle();
 window.addEventListener("focus", function(){
   // don't rebuild the view (and lose uncommitted edits / caret / scroll) while a dialog is open or a field is focused; next idle focus picks it up
   if(modal) return;
@@ -2200,6 +2238,7 @@ window.addEventListener("focus", function(){
   if(ae && (/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) || ae.isContentEditable)) return;
   if(eventsHandle && !eventsNeedsReconnect) readEvents(true);
   if(inboxHandle && !inboxNeedsReconnect) readInbox(true);
+  if(briefHandle && !briefNeedsReconnect) readBrief(true);
 });
 </script>
 </body>
