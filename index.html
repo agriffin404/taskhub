@@ -811,7 +811,10 @@ function inboxPendingHas(k){ for(var i=0;i<inboxPending.length;i++){ if(inboxPen
 
 function inboxFindTarget(m){
   if(!m || typeof m!=="object") return null;
-  if(m.id){ var byId=store.tasks.filter(function(t){return t.id===m.id;})[0]; if(byId) return byId; }
+  if(m.id){ var byId=store.tasks.filter(function(t){return t.id===m.id;})[0]; if(byId) return byId;
+    // tolerate a truncated id (e.g. an agent that dropped the "-xxxxx" suffix): match a UNIQUE id that starts with "<id>-"
+    var pref=store.tasks.filter(function(t){ return !t.deletedAt && (""+t.id).indexOf(m.id+"-")===0; });
+    if(pref.length===1) return pref[0]; }
   if(m.title){ var tl=(""+m.title).trim().toLowerCase(); var list=(m.list!=null)?(""+m.list).toLowerCase():null;
     var cands=store.tasks.filter(function(t){ return !t.deletedAt && (""+t.title).trim().toLowerCase()===tl && (!list||t.list===list); });
     if(cands.length===1) return cands[0]; }
