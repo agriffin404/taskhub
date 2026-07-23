@@ -1179,6 +1179,7 @@ function clearAiJob(id){ if(store.ai) store.ai.requests=store.ai.requests.filter
 function aiHasPending(type){ return !!(store.ai && store.ai.requests.some(function(r){ return r.type===type; })); }
 function requestBrief(){ if(!fileHandle){ toast("Link your data file first (\"Link all\") so your AI agent can build the brief."); return; } aiPush({ id:uid("air"), type:"brief", requestedAt:new Date().toISOString() }); save(); render(); toast("Brief requested — it'll appear on the next AI sync."); }
 function requestTriage(){ if(!fileHandle){ toast("Link your data file first (\"Link all\") so your AI agent can review your tasks."); return; } aiPush({ id:uid("air"), type:"triage", requestedAt:new Date().toISOString() }); save(); render(); toast("Cleanup requested — suggestions arrive in your review queue on the next AI sync."); }
+function cancelTriage(){ if(store.ai){ store.ai.requests=store.ai.requests.filter(function(r){ return r.type!=="triage"; }); save(); render(); toast("Cleanup request cancelled"); } }
 function requestQuickAdd(text){ if(!fileHandle){ toast("Link your data file first so your AI agent can add it."); return false; } aiPush({ id:uid("air"), type:"quickadd", text:text, requestedAt:new Date().toISOString() }); save(); render(); toast("Sent to your AI agent — the task will appear on the next AI sync."); return true; }
 
 // ---------------- natural-language quick-add parser (instant, in-browser) ----------------
@@ -1986,8 +1987,8 @@ function renderAiBrief(){
     body.appendChild(el('<div class="muted" style="font-size:13px; line-height:1.5">Your daily AI brief shows here once it\'s set up on a computer.</div>'));
   }
   if(fileHandle){
-    var tr=el('<button type="button" class="btn" style="width:100%; justify-content:center; margin-top:10px"'+(triagePending?' disabled':'')+' title="Ask the AI to flag missing due dates/priorities, stale tasks, and likely duplicates — suggestions land in your review queue.">'+ic('wand')+' '+(triagePending?'Cleanup requested…':'Suggest cleanup')+'</button>');
-    if(!triagePending) tr.onclick=function(){ requestTriage(); };
+    var tr=el('<button type="button" class="btn" style="width:100%; justify-content:center; margin-top:10px" title="'+(triagePending?"Click to cancel the pending cleanup request":"Ask the AI to flag missing due dates/priorities, stale tasks, and likely duplicates — suggestions land in your review queue.")+'">'+ic(triagePending?'trash':'wand')+' '+(triagePending?'Cleanup requested — cancel':'Suggest cleanup')+'</button>');
+    tr.onclick=function(){ if(triagePending) cancelTriage(); else requestTriage(); };
     body.appendChild(tr);
   }
   card.appendChild(body);
