@@ -168,10 +168,15 @@
   }
   /* ---- wide screens: show the sticky Today rail beside the main column ---- */
   @media (min-width:1180px){
-    .wrap { max-width:1560px; }
-    .layout { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:24px; align-items:start; }
+    .wrap { max-width:1760px; }
+    .layout { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:24px; align-items:start; }
     .rail { display:block; position:sticky; top:16px; align-self:start; max-height:calc(100vh - 32px); overflow:auto; }
     .rail-fallback { display:none; } /* Today view's inline calendar — rail covers it on wide screens */
+  }
+  /* ---- ultra-wide: use more of the screen and give the rail a bit more room ---- */
+  @media (min-width:1700px){
+    .wrap { max-width:min(2040px, 95vw); }
+    .layout { grid-template-columns:minmax(0,1fr) 400px; gap:28px; }
   }
 
   /* ---- dark mode ---- */
@@ -1964,7 +1969,7 @@ function renderAiBrief(){
   card.appendChild(head);
   var body=el('<div style="padding:12px 14px"></div>');
   if(hasBrief){
-    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0"></div>'); pv.innerHTML=renderNotesHTML(brief.text, false);
+    var pv=el('<div class="note-preview" style="background:transparent; border:none; padding:0; max-height:min(46vh,420px); overflow-y:auto"></div>'); pv.innerHTML=renderNotesHTML(brief.text, false);
     body.appendChild(pv);
     if(brief.generatedAt) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:8px">Updated '+esc(briefWhen(brief.generatedAt))+'</div>'));
     if(briefHandle && briefNeedsReconnect) body.appendChild(el('<div class="muted" style="font-size:11px; margin-top:4px">Brief file needs reconnecting — use <b>Reconnect all</b>.</div>'));
