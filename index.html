@@ -1485,13 +1485,13 @@ function renderAddBox(th){
   var qToday=el('<button class="chip" type="button" aria-pressed="false">Today</button>');
   var qTom=el('<button class="chip" type="button" aria-pressed="false">Tomorrow</button>');
   // reminder toggle + time (time only shows when "Remind me" is on, and only with a date)
-  var remChip=el('<button class="chip" type="button" aria-pressed="'+draftRemind+'">'+ic('bell')+' Remind me</button>');
+  var remChip=el('<button class="chip" type="button" aria-pressed="'+draftRemind+'" title="Turn on a reminder — if no date is set yet, this picks today">'+ic('bell')+' Remind me</button>');
   var timeSel=timeSelect(draftTime||"09:00", false, function(v){ if(v){ draftTime=v; } else { draftRemind=false; draftTime=""; syncDate(); } });
   function syncDate(){
     draftDate=dateInp.value;
     var hasD=!!draftDate;
     if(!hasD){ draftRemind=false; }
-    remChip.disabled=!hasD;
+    remChip.disabled=false;   // always clickable: clicking it supplies today's date when none is set
     remChip.setAttribute("aria-pressed", String(draftRemind));
     remChip.style.color = draftRemind?THEME.today.accent:"";
     timeSel.style.display = (draftRemind&&hasD)?"":"none";
@@ -1499,7 +1499,12 @@ function renderAddBox(th){
     qToday.style.color=dateInp.value===todayStr()?THEME.today.accent:""; qTom.style.color=dateInp.value===addDays(todayStr(),1)?THEME.today.accent:"";
     updClr();
   }
-  remChip.onclick=function(){ if(!draftDate)return; draftRemind=!draftRemind; if(draftRemind && !draftTime){ draftTime="09:00"; timeSel.value="09:00"; } syncDate(); };
+  remChip.onclick=function(){
+    if(!dateInp.value){ dateInp.value=todayStr(); }        // a reminder needs a day — default to today rather than doing nothing
+    draftRemind=!draftRemind;
+    if(draftRemind && !draftTime){ draftTime="09:00"; timeSel.value="09:00"; }
+    syncDate();
+  };
   qToday.onclick=function(){ dateInp.value=(dateInp.value===todayStr())?"":todayStr(); syncDate(); };
   qTom.onclick=function(){ var tm=addDays(todayStr(),1); dateInp.value=(dateInp.value===tm)?"":tm; syncDate(); };
   dateInp.onchange=syncDate;
@@ -1842,7 +1847,8 @@ function renderTask(t){
     var g2=el('<div class="grid2"></div>');
     var dd=el('<input type="date" class="field" aria-label="Due date" />'); dd.value=t.dueDate||""; dd.onchange=function(){ updateTask(t.id,{dueDate:dd.value||null, dueTime: dd.value?t.dueTime:null}); };
     var remOn=!!t.dueTime;
-    var remBtn=el('<button type="button" class="chip" aria-pressed="'+remOn+'"'+(t.dueDate?"":" disabled")+' style="'+(remOn?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>'); remBtn.onclick=function(){ if(t.dueDate) updateTask(t.id,{dueTime: remOn?null:"09:00"}); };
+    var remBtn=el('<button type="button" class="chip" aria-pressed="'+remOn+'" title="Turn on a reminder — if no due date is set yet, this picks today" style="'+(remOn?"color:"+THEME.today.accent:"")+'">'+ic('bell')+' Remind me</button>');
+    remBtn.onclick=function(){ if(!t.dueDate){ updateTask(t.id,{dueDate:todayStr(), dueTime:"09:00"}); return; } updateTask(t.id,{dueTime: remOn?null:"09:00"}); };
     g2.appendChild(el('<label class="lbl">Due date</label>')); g2.appendChild(el('<label class="lbl">Reminder</label>'));
     g2.appendChild(dd); g2.appendChild(remBtn); d.appendChild(g2);
     if(remOn){ var dt2=timeSelect(t.dueTime, false, function(v){ updateTask(t.id,{dueTime:v||null}); }); var rrow=el('<div class="row" style="gap:8px; align-items:center"></div>'); rrow.appendChild(el('<label class="lbl">Remind at</label>')); rrow.appendChild(dt2); d.appendChild(rrow); }
