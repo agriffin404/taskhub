@@ -973,7 +973,10 @@ function buildTodoFeed(){
   var tz=tzName();
   return store.tasks.filter(function(t){return !t.deletedAt;}).map(function(t){
     var hasDate=!!t.dueDate;
-    var hasRem = hasDate && !!t.dueTime;           // reminder only when a time is set
+    // reminder only when a time is set AND the task is still open. Completed tasks must ship
+    // isReminderOn:false — otherwise every sync re-arms the reminder on the completed To Do
+    // item and Outlook keeps re-firing it after each dismiss ("stuck" reminders).
+    var hasRem = hasDate && !!t.dueTime && !t.completed;
     // due date is date-only in To Do; send noon UTC so it never shifts a day across time zones
     var due = hasDate ? (t.dueDate + "T12:00:00Z") : null;
     // reminder is the real instant in UTC (local date+time converted)
