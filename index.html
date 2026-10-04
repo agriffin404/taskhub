@@ -135,6 +135,12 @@
   .field:focus-visible, .titleInput:focus-visible { outline:2px solid #6366f1; outline-offset:0; border-color:#6366f1; }
   a.calllink:focus-visible, .menu button:focus-visible { outline:2px solid #6366f1; outline-offset:-2px; }
 
+  /* ---- AI Brief task links + the flash on the task they jump to ---- */
+  a.tasklink { font-weight:600; text-decoration:underline dotted; text-underline-offset:2px; cursor:pointer; }
+  @keyframes jumpflash { 0%,40% { box-shadow:0 0 0 3px #6366f1; } 100% { box-shadow:0 0 0 0 rgba(99,102,241,0); } }
+  .task.jumpflash { animation:jumpflash 2.2s ease-out; }
+  .task[data-tid] { scroll-margin-top:16px; }
+
   /* ---- selected task highlight (class so dark mode can override) ---- */
   .task.sel { background:#eff6ff; border-color:#bfdbfe; }
 
@@ -343,13 +349,15 @@ function mdEmph(s){ return s
 function inlineRender(raw){
   raw=(raw==null?"":(""+raw));
   var tokens=[], m;
+  var re0=/\[([^\]]+)\]\(task:([A-Za-z0-9_-]+)\)/g;   // [Task title](task:<id>) -> in-app jump link (AI Brief)
+  while((m=re0.exec(raw))){ tokens.push({start:m.index,end:m.index+m[0].length,label:m[1],task:m[2]}); }
   var re1=/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
   while((m=re1.exec(raw))){ tokens.push({start:m.index,end:m.index+m[0].length,label:m[1],url:m[2]}); }
   var re2=/https?:\/\/[^\s<>()]+/g;
   while((m=re2.exec(raw))){ var bs=m.index,be=bs+m[0].length; if(tokens.some(function(t){return bs<t.end&&be>t.start;}))continue; var url=m[0].replace(/[.,;:!?'"\]]+$/,""); tokens.push({start:bs,end:bs+url.length,label:url,url:url}); }
   tokens.sort(function(a,b){return a.start-b.start;});
   var out="", pos=0;
-  tokens.forEach(function(t){ if(t.start<pos)return; out+=mdEmph(esc(raw.slice(pos,t.start))); out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; });
+  tokens.forEach(function(t){ if(t.start<pos)return; out+=mdEmph(esc(raw.slice(pos,t.start))); if(t.task){ out+='<a href="#" class="tasklink" data-task="'+esc(t.task)+'" title="Go to this task">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; return; } out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; });
   out+=mdEmph(esc(raw.slice(pos)));
   return out;
 }
@@ -1800,7 +1808,7 @@ function buildRecurPop(t){
 
 function renderTask(t){
   var meta=PRIO[t.priority];
-  var node=el('<div class="task'+(selected[t.id]?' sel':'')+'" style="border-left-color:'+meta.dot+'"></div>');
+  var node=el('<div class="task'+(selected[t.id]?' sel':'')+'" data-tid="'+esc(t.id)+'" style="border-left-color:'+meta.dot+'"></div>');
   if(view!=="today" && !selectMode){
     var grip=el('<button class="grip" draggable="true" data-grip="'+esc(t.id)+'" title="Drag to reschedule (or use arrow keys)" aria-label="Reschedule '+esc(t.title)+'. Use up and down arrow keys to move between Earlier, Today, Tomorrow, Later and No Due Date.">'+ic('grip')+'</button>');
     grip.ondragstart=function(e){ dragId=t.id; node.classList.add("dragging"); if(e.dataTransfer){ e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", t.id); }catch(_){ } try{ e.dataTransfer.setDragImage(node,12,12); }catch(_){ } } };
@@ -2095,6 +2103,21 @@ function renderEventRow(e){
 
 // rail card: the daily AI planning brief + a "suggest cleanup" (triage) action. Agent-generated via the inbox.
 function briefWhen(iso){ try{ var d=new Date(iso); return d.toLocaleString(undefined,{weekday:"short",hour:"numeric",minute:"2-digit"}); }catch(e){ return ""; } }
+// AI Brief task link -> scroll to that task, open its details, and flash it (clears view/filters only if they hide it)
+function jumpToTask(id){
+  var t=store.tasks.filter(function(x){ return x.id===id; })[0];
+  if(!t || t.deletedAt){ toast("That task was deleted or no longer exists"); return; }
+  if(currentVisibleIds().indexOf(id)<0){ view="combined"; filter="all"; prioFilter="all"; search=""; }
+  expanded[id]=true; render();
+  var sel='.task[data-tid="'+((window.CSS&&CSS.escape)?CSS.escape(id):id)+'"]';
+  var node=document.querySelector(sel);
+  if(!node){ toast("Couldn't find that task on screen"); return; }
+  node.scrollIntoView({behavior:"smooth", block:"start"});   // start, not center: an expanded task can be taller than the window
+  node.classList.remove("jumpflash"); void node.offsetWidth; node.classList.add("jumpflash");
+  if(t.completed) toast("That task is already completed");
+}
+// one capture-phase handler so [title](task:id) links work anywhere notes render (brief, task notes, scratchpad)
+if(typeof document!=="undefined") document.addEventListener("click", function(e){ var tl=e.target.closest && e.target.closest("a[data-task]"); if(!tl) return; e.preventDefault(); e.stopPropagation(); jumpToTask(tl.getAttribute("data-task")); }, true);
 function renderAiBrief(){
   if(!store.ai) store.ai=normalizeAi(null);
   var brief=store.ai.brief||{text:"",generatedAt:""}, triagePending=aiHasPending("triage");
