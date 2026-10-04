@@ -140,6 +140,9 @@
   @keyframes jumpflash { 0%,40% { box-shadow:0 0 0 3px #6366f1; } 100% { box-shadow:0 0 0 0 rgba(99,102,241,0); } }
   .task.jumpflash { animation:jumpflash 2.2s ease-out; }
   .task[data-tid] { scroll-margin-top:16px; }
+  a.askai { display:inline-flex; vertical-align:-2px; margin-left:4px; color:#f59e0b; text-decoration:none; }
+  a.askai svg { width:14px; height:14px; }
+  a.askai:hover { color:#d97706; }
 
   /* ---- selected task highlight (class so dark mode can override) ---- */
   .task.sel { background:#eff6ff; border-color:#bfdbfe; }
@@ -357,7 +360,7 @@ function inlineRender(raw){
   while((m=re2.exec(raw))){ var bs=m.index,be=bs+m[0].length; if(tokens.some(function(t){return bs<t.end&&be>t.start;}))continue; var url=m[0].replace(/[.,;:!?'"\]]+$/,""); tokens.push({start:bs,end:bs+url.length,label:url,url:url}); }
   tokens.sort(function(a,b){return a.start-b.start;});
   var out="", pos=0;
-  tokens.forEach(function(t){ if(t.start<pos)return; out+=mdEmph(esc(raw.slice(pos,t.start))); if(t.task){ out+='<a href="#" class="tasklink" data-task="'+esc(t.task)+'" title="Go to this task">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; return; } out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; });
+  tokens.forEach(function(t){ if(t.start<pos)return; out+=mdEmph(esc(raw.slice(pos,t.start))); if(t.task){ out+='<a href="#" class="tasklink" data-task="'+esc(t.task)+'" title="Go to this task">'+mdEmph(esc(t.label))+'</a><a href="#" class="askai" data-askai="'+esc(t.task)+'" title="Get Claude\'s help with this task (copies a prompt, opens a new chat)" aria-label="Get Claude\'s help with: '+esc(t.label)+'">'+ic('sparkles')+'</a>'; pos=t.end; return; } out+='<a href="'+esc(t.url)+'" target="_blank" rel="noopener noreferrer">'+mdEmph(esc(t.label))+'</a>'; pos=t.end; });
   out+=mdEmph(esc(raw.slice(pos)));
   return out;
 }
@@ -1130,7 +1133,8 @@ var groupBy = "date";     // date | priority | list | none
 var expanded = {};   // task id -> bool
 var menuOpen = null; // task id for calendar menu
 var aiMenuOpen = null; // task id for the per-task "Ask AI" menu
-var aiCfg = { url:"" };  // AI agent link (your assistant's URL) — stored locally in prefs, never in the repo
+var AI_DEFAULT_URL = "https://claude.ai/new";   // a fresh Claude chat
+var aiCfg = { url:AI_DEFAULT_URL };  // AI agent link — defaults to Claude; a custom one is stored locally in prefs, never in the repo
 var popover = null;  // {id, kind:'due'|'prio'|'note'} inline meta editor
 var modal = null;    // 'export' | 'import' | null
 var importBuf = "";
@@ -1145,7 +1149,7 @@ function toggleTheme(){ darkMode=!darkMode; try{ localStorage.setItem(THEME_KEY,
 
 // remember view / filters / sort across sessions
 var PREFS_KEY = "taskhub-prefs-v1";
-function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact, evOpen:evOpen, hideDeclined:hideDeclined, aiAgentUrl:aiCfg.url, lastBackupAt:lastBackupAt, lastFileWrite:lastFileWrite })); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify({ view:view, filter:filter, prioFilter:prioFilter, sortMode:sortMode, sortDir:sortDir, groupBy:groupBy, compact:compact, evOpen:evOpen, hideDeclined:hideDeclined, aiAgentUrl2:aiCfg.url, lastBackupAt:lastBackupAt, lastFileWrite:lastFileWrite })); }catch(e){} }
 function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}");
   if(["today","combined","work","personal"].indexOf(p.view)>=0) view=p.view;
   if(["all","active","completed"].indexOf(p.filter)>=0) filter=p.filter;
@@ -1155,7 +1159,7 @@ function loadPrefs(){ try{ var p=JSON.parse(localStorage.getItem(PREFS_KEY)||"{}
   if(["date","priority","list","none"].indexOf(p.groupBy)>=0) groupBy=p.groupBy;
   if(typeof p.compact==="boolean") compact=p.compact;
   if(typeof p.evOpen==="boolean") evOpen=p.evOpen;
-  if(typeof p.aiAgentUrl==="string") aiCfg.url=p.aiAgentUrl;
+  if(typeof p.aiAgentUrl2==="string") aiCfg.url=p.aiAgentUrl2;   // "2": the Oct 2026 switch to Claude ignores the older saved link once
   if(typeof p.lastBackupAt==="number") lastBackupAt=p.lastBackupAt;
   if(typeof p.hideDeclined==="boolean") hideDeclined=p.hideDeclined;
   if(p.lastFileWrite && typeof p.lastFileWrite.exportedAt==="string") lastFileWrite={ exportedAt:p.lastFileWrite.exportedAt, at:(typeof p.lastFileWrite.at==="number"?p.lastFileWrite.at:0) };
@@ -1241,7 +1245,9 @@ function saveNoteQuiet(id,val){
 // (2) Auto — write a request into the data file for your AI agent to pick up and answer via the AI inbox.
 var AI_ASKS = {
   steps:     { label:"Break into smaller steps", ask:"Break this task into a short, ordered checklist of concrete, actionable steps. Reply with ONLY the checklist — each step on its own line starting with \"- [ ] \"." },
-  solutions: { label:"Suggest solutions / approach", ask:"Suggest 2–4 concrete, practical ways to accomplish this task. For each, give a one-line summary followed by a couple of specific pointers." }
+  solutions: { label:"Suggest solutions / approach", ask:"Suggest 2–4 concrete, practical ways to accomplish this task. For each, give a one-line summary followed by a couple of specific pointers." },
+  complete:  { label:"Help me complete it (new Claude chat)", handoffOnly:true, url:"https://claude.ai/new",
+               ask:"Help me get this task done. Use the tools and connectors you have to find what you need and do as much of the work as you can. If something important is missing or unclear, ask me short, specific questions first (one at a time) before you start. Finish by telling me what's done and what's left for me." }
 };
 function aiTaskContext(t){
   var parts=["Task: "+((t.title||"").trim())];
@@ -1250,22 +1256,24 @@ function aiTaskContext(t){
   var n=notesToPlain(t.notes||"").trim(); if(n) parts.push("Notes / context:\n"+n);
   return parts.join("\n");
 }
-function aiPromptText(t, kind){ var a=AI_ASKS[kind]||AI_ASKS.steps; return a.ask+"\n\n"+aiTaskContext(t); }
+function aiPromptText(t, kind, extra){ var a=AI_ASKS[kind]||AI_ASKS.steps; return a.ask+"\n\n"+aiTaskContext(t)+(extra?("\n"+extra):""); }
 function setAiAgentUrl(){
   var cur=aiCfg.url||"";
-  var v=window.prompt("Paste the link to your AI assistant. It's stored only on this device and is opened when you use \"open in your AI\".", cur);
+  var v=window.prompt("Paste the link to your AI assistant. It's stored only on this device and is opened when you use \"open in your AI\". Leave it blank to use Claude ("+AI_DEFAULT_URL+").", cur);
   if(v===null) return false;                 // cancelled
   v=(v||"").trim();
   if(v && !/^https?:\/\//i.test(v)) v="https://"+v;
-  aiCfg.url=v; savePrefs();
-  toast(v?"AI agent link saved":"AI agent link cleared");
+  aiCfg.url=v||AI_DEFAULT_URL; savePrefs();
+  toast(v?"AI agent link saved":"AI agent link reset to Claude");
   return true;
 }
 // Handoff: copy the prompt, then open the configured agent in a new tab so you can paste it there.
-function aiHandoff(t, kind){
+// The prompt travels by clipboard, never in the URL (task text stays out of browser history and server logs).
+function aiHandoff(t, kind, extra){
   aiMenuOpen=null;
-  var text=aiPromptText(t, kind), open=function(){ if(aiCfg.url){ try{ window.open(aiCfg.url,"_blank","noopener"); }catch(e){} } };
-  function done(){ if(aiCfg.url){ toast("Prompt copied — opening your AI agent. Paste it there, then paste the answer back into the task notes."); open(); } else { toast("Prompt copied. Paste it into your AI assistant.", {label:"Set agent link", fn:function(){ setAiAgentUrl(); }}); } render(); }
+  var dest=(AI_ASKS[kind]&&AI_ASKS[kind].url)||aiCfg.url;   // "complete" always opens a fresh Claude chat
+  var text=aiPromptText(t, kind, extra), open=function(){ if(dest){ try{ window.open(dest,"_blank","noopener"); }catch(e){} } };
+  function done(){ if(dest){ toast(/^https:\/\/claude\.ai\//i.test(dest) ? "Prompt copied — opening a new Claude chat. Press Ctrl+V there to start." : "Prompt copied — opening your AI agent. Paste it there, then paste the answer back into the task notes."); open(); } else { toast("Prompt copied. Paste it into your AI assistant.", {label:"Set agent link", fn:function(){ setAiAgentUrl(); }}); } render(); }
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); }
   else { try{ window.prompt("Copy this prompt for your AI assistant:", text); }catch(e){} done(); }
 }
@@ -1934,7 +1942,7 @@ function renderTask(t){
       am.appendChild(el('<div style="padding:7px 12px 3px; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:'+(darkMode?"#8a857e":"#94a3b8")+'">Open in your AI</div>'));
       Object.keys(AI_ASKS).forEach(function(k){ var b=el('<button role="menuitem">'+ic('external')+' '+esc(AI_ASKS[k].label)+'</button>'); b.onclick=function(){ aiHandoff(t,k); }; am.appendChild(b); });
       am.appendChild(el('<div style="padding:7px 12px 3px; margin-top:2px; border-top:1px solid '+(darkMode?"#38332e":"#eef0f4")+'; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:'+(darkMode?"#8a857e":"#94a3b8")+'">Send to AI agent (auto-applies)</div>'));
-      Object.keys(AI_ASKS).forEach(function(k){ var dis=!fileHandle; var b=el('<button role="menuitem"'+(dis?' disabled title="Link your data file first"':'')+'>'+ic('sparkles')+' '+esc(AI_ASKS[k].label)+'</button>'); if(!dis) b.onclick=function(){ aiRequestAuto(t,k); }; am.appendChild(b); });
+      Object.keys(AI_ASKS).filter(function(k){ return !AI_ASKS[k].handoffOnly; }).forEach(function(k){ var dis=!fileHandle; var b=el('<button role="menuitem"'+(dis?' disabled title="Link your data file first"':'')+'>'+ic('sparkles')+' '+esc(AI_ASKS[k].label)+'</button>'); if(!dis) b.onclick=function(){ aiRequestAuto(t,k); }; am.appendChild(b); });
       var gear=el('<button role="menuitem" style="border-top:1px solid '+(darkMode?"#38332e":"#eef0f4")+'; font-size:12px; color:'+(darkMode?"#a5a099":"#64748b")+'">'+ic('link')+' '+(aiCfg.url?"Change":"Set")+' AI agent link&hellip;</button>'); gear.onclick=function(){ aiMenuOpen=null; setAiAgentUrl(); render(); }; am.appendChild(gear);
     }
     actions.appendChild(am);
@@ -2117,7 +2125,19 @@ function jumpToTask(id){
   if(t.completed) toast("That task is already completed");
 }
 // one capture-phase handler so [title](task:id) links work anywhere notes render (brief, task notes, scratchpad)
-if(typeof document!=="undefined") document.addEventListener("click", function(e){ var tl=e.target.closest && e.target.closest("a[data-task]"); if(!tl) return; e.preventDefault(); e.stopPropagation(); jumpToTask(tl.getAttribute("data-task")); }, true);
+// ✨ next to a task link: hand the task to a new Claude chat; the rest of the line (e.g. the brief's suggested next step) rides along as context
+if(typeof document!=="undefined") document.addEventListener("click", function(e){
+  if(!e.target.closest) return;
+  var ak=e.target.closest("a[data-askai]");
+  if(ak){ e.preventDefault(); e.stopPropagation();
+    var id=ak.getAttribute("data-askai"), t=store.tasks.filter(function(x){ return x.id===id && !x.deletedAt; })[0];
+    if(!t){ toast("That task was deleted or no longer exists"); return; }
+    var line=ak.closest("li,div"), step="";
+    if(line){ var txt=(line.textContent||"").replace(/\s+/g," "), at=txt.indexOf(t.title), m=(at>=0)?txt.slice(at+t.title.length).match(/^\s*(?:\([^)]*\))?\s*:\s*(\S.*)$/):null; if(m) step=m[1].trim(); }   // "[Title] (due 9 AM): <step>" -> <step>
+    aiHandoff(t, "complete", step ? ("Suggested next step from my morning brief: "+step) : "");
+    return; }
+  var tl=e.target.closest("a[data-task]"); if(!tl) return; e.preventDefault(); e.stopPropagation(); jumpToTask(tl.getAttribute("data-task"));
+}, true);
 function renderAiBrief(){
   if(!store.ai) store.ai=normalizeAi(null);
   var brief=store.ai.brief||{text:"",generatedAt:""}, triagePending=aiHasPending("triage");
