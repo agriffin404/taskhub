@@ -1267,13 +1267,23 @@ function setAiAgentUrl(){
   toast(v?"AI agent link saved":"AI agent link reset to Claude");
   return true;
 }
-// Handoff: copy the prompt, then open the configured agent in a new tab so you can paste it there.
-// The prompt travels by clipboard, never in the URL (task text stays out of browser history and server logs).
+// Handoff: open the configured agent in a new tab with the prompt ready to send.
+// Claude links take the prompt in the URL (?q=), so the new chat opens pre-filled and you only press Enter (Oct 2026, by request).
+// Other agents still get the prompt via clipboard only. The clipboard copy is always made as a fallback.
+var AI_URL_PROMPT_MAX = 6000;   // characters of prompt carried in the URL; longer prompts fall back to clipboard (browser URL limits)
+function aiPrefillUrl(dest, text){
+  if(!/^https:\/\/claude\.ai\//i.test(dest) || !text || text.length>AI_URL_PROMPT_MAX) return null;
+  try{ return dest + (dest.indexOf("?")>=0 ? "&" : "?") + "q=" + encodeURIComponent(text); }catch(e){ return null; }
+}
 function aiHandoff(t, kind, extra){
   aiMenuOpen=null;
   var dest=(AI_ASKS[kind]&&AI_ASKS[kind].url)||aiCfg.url;   // "complete" always opens a fresh Claude chat
-  var text=aiPromptText(t, kind, extra), open=function(){ if(dest){ try{ window.open(dest,"_blank","noopener"); }catch(e){} } };
-  function done(){ if(dest){ toast(/^https:\/\/claude\.ai\//i.test(dest) ? "Prompt copied — opening a new Claude chat. Press Ctrl+V there to start." : "Prompt copied — opening your AI agent. Paste it there, then paste the answer back into the task notes."); open(); } else { toast("Prompt copied. Paste it into your AI assistant.", {label:"Set agent link", fn:function(){ setAiAgentUrl(); }}); } render(); }
+  var text=aiPromptText(t, kind, extra), pre=dest?aiPrefillUrl(dest, text):null;
+  var open=function(){ if(dest){ try{ window.open(pre||dest,"_blank","noopener"); }catch(e){} } };
+  function done(){
+    if(dest){ toast(pre ? "Opening a new Claude chat with the prompt filled in — just press Enter there." : (/^https:\/\/claude\.ai\//i.test(dest) ? "Prompt copied — opening a new Claude chat. Press Ctrl+V there to start." : "Prompt copied — opening your AI agent. Paste it there, then paste the answer back into the task notes.")); open(); }
+    else { toast("Prompt copied. Paste it into your AI assistant.", {label:"Set agent link", fn:function(){ setAiAgentUrl(); }}); }
+    render(); }
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, done); }
   else { try{ window.prompt("Copy this prompt for your AI assistant:", text); }catch(e){} done(); }
 }
