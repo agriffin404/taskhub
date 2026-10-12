@@ -379,7 +379,9 @@ function renderNotesHTML(raw, interactive){
       else { items.push('<li style="list-style:none;margin-left:-18px">'+(done?"&#9745;":"&#9744;")+" "+ckTxt+"</li>"); }
       ck++;
     }
-    else if(ul){ if(listType&&listType!=="ul")flush(); listType="ul"; items.push("<li>"+inlineRender(ul[1])+"</li>"); }
+    else if(ul){ if(listType&&listType!=="ul")flush(); listType="ul";
+      var sub=/^( {2,}|\t)/.test(ln);   // indented "  - x" = sub-bullet (e.g. brief talking points under a meeting)
+      items.push(sub ? '<li style="margin-left:16px;list-style:circle;font-size:.94em;opacity:.9">'+inlineRender(ul[1])+"</li>" : "<li>"+inlineRender(ul[1])+"</li>"); }
     else if(ol){ if(listType&&listType!=="ol")flush(); listType="ol"; items.push("<li>"+inlineRender(ol[1])+"</li>"); }
     else { flush(); chunks.push(inlineRender(ln)); }
   }
