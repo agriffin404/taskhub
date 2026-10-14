@@ -898,6 +898,7 @@ function inboxCoerce(s){   // -> validated patch containing only recognized task
   if(typeof s.dueTime==="string" && validHM(s.dueTime)) p.dueTime=normHM(s.dueTime);
   if(s.remind===false) p.dueTime=null;
   if(s.remind===true && !("dueTime" in p)) p.dueTime="09:00";
+  if(s.recur!=null){ var rc=(""+s.recur).toLowerCase(); if(RECUR_LABEL[rc]) p.recur=rc; }   // none|daily|weekdays|weekly|monthly|yearly
   return p;
 }
 function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — permanent:true = never retry this op
@@ -918,7 +919,10 @@ function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — 
     if(givenId && store.tasks.filter(function(t){return t.id===givenId;}).length) return {ok:false, permanent:true, desc:"Add skipped (id exists)"};
     var tag="[ai]"+(op.source?(" "+op.source):""); var notes=(p.notes||"").trim(); notes = notes ? (notes+"\n\n"+tag) : tag;
     var dd=p.dueDate||null;
-    store.tasks.push({ id:givenId||uid("t"), title:p.title, list:p.list||"work", sectionId:null, priority:p.priority||"medium", dueDate:dd, dueTime:(dd?(p.dueTime||null):null), notes:notes, completed:false, completedAt:null, recur:"none", deletedAt:null, createdAt:Date.now(), createdBy:opSrc(op), updatedAt:Date.now(), updatedBy:opSrc(op) });
+    var rec=(dd && p.recur) ? p.recur : "none";   // a repeat needs a due date to roll forward from
+    var nt={ id:givenId||uid("t"), title:p.title, list:p.list||"work", sectionId:null, priority:p.priority||"medium", dueDate:dd, dueTime:(dd?(p.dueTime||null):null), notes:notes, completed:false, completedAt:null, recur:rec, deletedAt:null, createdAt:Date.now(), createdBy:opSrc(op), updatedAt:Date.now(), updatedBy:opSrc(op) };
+    if(rec!=="none") nt.recurDay=+dd.slice(8,10);
+    store.tasks.push(nt);
     return {ok:true, desc:"Added “"+p.title+"”"};
   }
   var t=inboxFindTarget(op.match);
@@ -938,7 +942,8 @@ function inboxApply(op){    // mutates store; returns {ok, desc, permanent} — 
   if(a==="update"||a==="reschedule"){ var patch=inboxCoerce(op.set||{});
     if(op.set && op.set.remind===true && typeof op.set.dueTime!=="string" && t.dueTime) delete patch.dueTime;   // remind:true on a task that already has a time keeps that time (don't reset to 09:00)
     if(patch.dueDate) patch.recurDay=+patch.dueDate.slice(8,10);                                                 // a hand-set date re-anchors monthly/yearly recurrence
-    var merged=Object.assign({},t,stampPatch(patch, opSrc(op))); if(!merged.dueDate) merged.dueTime=null; if(op.clearAiRequest) merged.aiRequest=null; store.tasks=store.tasks.map(function(x){ return x.id===t.id?merged:x; }); return {ok:true, desc:(a==="reschedule"?"Rescheduled “":"Updated “")+t.title+"”"}; }
+    var merged=Object.assign({},t,stampPatch(patch, opSrc(op))); if(!merged.dueDate){ merged.dueTime=null; if(merged.recur && merged.recur!=="none") merged.recur="none"; }
+    if(patch.recur && patch.recur!=="none" && merged.dueDate && !merged.recurDay) merged.recurDay=+merged.dueDate.slice(8,10); if(op.clearAiRequest) merged.aiRequest=null; store.tasks=store.tasks.map(function(x){ return x.id===t.id?merged:x; }); return {ok:true, desc:(a==="reschedule"?"Rescheduled “":"Updated “")+t.title+"”"}; }
   return {ok:false, permanent:true, desc:"Unknown action: "+a};
 }
 function processInbox(data, silent){
@@ -1013,7 +1018,7 @@ var INBOX_SCHEMA = JSON.stringify({
     ops:{ type:"array", items:{ type:"object", properties:{
       opId:{type:"string", description:"Must be unique across ALL batches ever written (e.g. prefix with a date or message id). TaskHub remembers applied opIds and silently skips repeats."},
       action:{type:"string", enum:["add","update","reschedule","complete","uncomplete","delete"]},
-      task:{type:"object", properties:{ id:{type:"string"}, title:{type:"string"}, list:{type:"string"}, priority:{type:"string"}, dueDate:{}, dueTime:{}, remind:{type:"boolean"}, notes:{type:"string"} }},
+      task:{type:"object", properties:{ id:{type:"string"}, title:{type:"string"}, list:{type:"string"}, priority:{type:"string"}, dueDate:{}, dueTime:{}, remind:{type:"boolean"}, notes:{type:"string"}, recur:{type:"string", enum:["none","daily","weekdays","weekly","monthly","yearly"], description:"Repeat; needs a dueDate. Also accepted in update's set."} }},
       match:{type:"object", properties:{ id:{type:"string"}, title:{type:"string"}, list:{type:"string"} }},
       set:{type:"object"},
       source:{type:"string"},
