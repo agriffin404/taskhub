@@ -1126,7 +1126,7 @@ trackTombstones();   // baseline id set — from here on, anything that leaves s
 var view = "combined";
 var addList = "work";
 var dragId = null;   // task id currently being dragged
-var draftTitle = "", draftPrio = "medium", draftDate = "", draftTime = "", draftRemind = false, draftNotes = "";   // add-box draft (survives re-render)
+var draftTitle = "", draftPrio = "medium", draftDate = "", draftTime = "", draftRemind = false, draftNotes = "", draftRecur = "none";   // add-box draft (survives re-render)
 var filter = "all";
 var preCompletedSort = null;   // remembers sort/group to restore when leaving the Completed filter
 var prioFilter = "all";
@@ -1207,7 +1207,9 @@ function archiveOldDone(){
 }
 
 // ---------------- mutations (every user action snapshots for undo) ----------------
-function addTask(title, list, sectionId, priority, dueDate, dueTime, notes){ title=(title||"").trim(); if(!title)return; pushHistory(); store.tasks.push({ id:uid("t"), title:title, list:list, sectionId:sectionId||null, priority:priority||"medium", dueDate:dueDate||null, dueTime:(dueDate?(dueTime||null):null), notes:(notes||"").trim(), completed:false, completedAt:null, recur:"none", deletedAt:null, createdAt:Date.now(), createdBy:"app", updatedAt:Date.now(), updatedBy:"app" }); save(); render(); toast('Added "'+title+'"', {label:"Undo", fn:doUndo}); }
+function addTask(title, list, sectionId, priority, dueDate, dueTime, notes, recur){ title=(title||"").trim(); if(!title)return; pushHistory(); var rec=(dueDate && recur && RECUR_LABEL[recur])?recur:"none";   // a repeat needs a due date to roll forward from
+  var nt={ id:uid("t"), title:title, list:list, sectionId:sectionId||null, priority:priority||"medium", dueDate:dueDate||null, dueTime:(dueDate?(dueTime||null):null), notes:(notes||"").trim(), completed:false, completedAt:null, recur:rec, deletedAt:null, createdAt:Date.now(), createdBy:"app", updatedAt:Date.now(), updatedBy:"app" }; if(rec!=="none") nt.recurDay=+dueDate.slice(8,10);
+  store.tasks.push(nt); save(); render(); toast('Added "'+title+'"'+(rec!=="none"?(" (repeats "+RECUR_LABEL[rec].toLowerCase()+")"):""), {label:"Undo", fn:doUndo}); }
 // human-friendly summary of a single-task edit, used for the undo toast
 function describePatch(patch, t){
   var title = t ? '"'+t.title+'"' : "task";
@@ -1584,8 +1586,8 @@ function renderAddBox(th){
   var btn=el('<button class="btn btn-primary" style="background:'+th.grad+'; padding:8px 16px">Add</button>'); btn.onclick=doAdd;
   // discard-draft button — only visible when the add box has an unfinished draft
   var clr=el('<button class="iconbtn" title="Discard this draft" aria-label="Discard draft task" style="flex:0 0 auto; align-self:center; color:'+odC()+'">'+ic('trash')+'</button>');
-  clr.onclick=function(){ draftTitle=""; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; render(); var a=document.getElementById("addInput"); if(a)a.focus(); };
-  function draftDirty(){ return !!(String(draftTitle).trim() || String(draftNotes).trim() || draftDate || draftRemind || draftPrio!=="medium"); }
+  clr.onclick=function(){ draftTitle=""; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; draftRecur="none"; render(); var a=document.getElementById("addInput"); if(a)a.focus(); };
+  function draftDirty(){ return !!(String(draftTitle).trim() || String(draftNotes).trim() || draftDate || draftRemind || draftPrio!=="medium" || draftRecur!=="none"); }
   function updClr(){ var d=draftDirty(); clr.style.display=d?"":"none"; box.classList.toggle("open", d); }
   r.appendChild(inp); r.appendChild(clr); r.appendChild(btn); box.appendChild(r); updClr();
   // hybrid natural-language quick-add: parse the title as you type and show what was detected
@@ -1610,11 +1612,14 @@ function renderAddBox(th){
   var qTom=el('<button class="chip" type="button" aria-pressed="false">Tomorrow</button>');
   // reminder toggle + time (time only shows when "Remind me" is on, and only with a date)
   var remChip=el('<button class="chip" type="button" aria-pressed="'+draftRemind+'" title="Turn on a reminder — if no date is set yet, this picks today">'+ic('bell')+' Remind me</button>');
+  // repeat — same choices as the task details panel; picking one with no date set supplies today
+  var recSel=el('<select class="field" aria-label="Repeats" title="Repeat — needs a due date; picks today if none is set"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekdays">Every weekday</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Annually</option></select>'); recSel.value=draftRecur;
+  recSel.onchange=function(){ draftRecur=recSel.value; if(draftRecur!=="none" && !dateInp.value){ dateInp.value=todayStr(); } syncDate(); };
   var timeSel=timeSelect(draftTime||"09:00", false, function(v){ if(v){ draftTime=v; } else { draftRemind=false; draftTime=""; syncDate(); } });
   function syncDate(){
     draftDate=dateInp.value;
     var hasD=!!draftDate;
-    if(!hasD){ draftRemind=false; }
+    if(!hasD){ draftRemind=false; draftRecur="none"; recSel.value="none"; }   // no date = no repeat (nothing to roll forward from)
     remChip.disabled=false;   // always clickable: clicking it supplies today's date when none is set
     remChip.setAttribute("aria-pressed", String(draftRemind));
     remChip.style.color = draftRemind?THEME.today.accent:"";
@@ -1632,7 +1637,7 @@ function renderAddBox(th){
   qToday.onclick=function(){ dateInp.value=(dateInp.value===todayStr())?"":todayStr(); syncDate(); };
   qTom.onclick=function(){ var tm=addDays(todayStr(),1); dateInp.value=(dateInp.value===tm)?"":tm; syncDate(); };
   dateInp.onchange=syncDate;
-  ctrls.appendChild(qToday); ctrls.appendChild(qTom); ctrls.appendChild(remChip); ctrls.appendChild(timeSel);
+  ctrls.appendChild(qToday); ctrls.appendChild(qTom); ctrls.appendChild(remChip); ctrls.appendChild(timeSel); ctrls.appendChild(recSel);
   var extra=el('<div class="add-extra"></div>');   // priority/date/notes — revealed when you click into the add box
   extra.appendChild(ctrls);
   syncDate();
@@ -1651,8 +1656,9 @@ function renderAddBox(th){
     else { dd=null; tt2=null; }
     var pr=(draftPrio!=="medium")?draftPrio:p.priority;
     var lst=(view==="combined")?p.list:view;   // p.list defaults to addList, so overriding only happens when detected
-    draftTitle=""; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes="";
-    addTask(title, lst, null, pr, dd, tt2, nt); var a2=document.getElementById("addInput"); if(a2)a2.focus();
+    var rc=draftRecur;
+    draftTitle=""; draftPrio="medium"; draftDate=""; draftTime=""; draftRemind=false; draftNotes=""; draftRecur="none";
+    addTask(title, lst, null, pr, dd, tt2, nt, rc); var a2=document.getElementById("addInput"); if(a2)a2.focus();
   }
   return box;
 }
