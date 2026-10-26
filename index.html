@@ -1062,7 +1062,7 @@ function buildTodoFeed(){
     body = parts.join("<br><br>");
     return {
       id: t.id,
-      title: "TaskHub: " + t.title,   // prefix so Outlook/To Do reminders show where they came from (matching is by [taskhub:id], not title)
+      title: (hasRem ? "TaskHub Reminder: " : "") + t.title,   // prefix only tasks with a live reminder, so Outlook pop-ups show their source (matching is by [taskhub:id], not title)
       list: (THEME[t.list] && THEME[t.list].label) || t.list,
       importance: IMPORTANCE[t.priority] || "normal",
       status: t.completed ? "completed" : "notStarted",
